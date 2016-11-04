@@ -1,0 +1,7 @@
+8000 bytes
+0x0000 - 0x1F40
+
+0x1EF0 - 0x1F40 : Screen
+?      - 0x1EEF : Stack
+
+Program starts at 0x0000

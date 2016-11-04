@@ -1,0 +1,19 @@
+{
+  "name": "nanofeather",
+  "version": "1.0.0",
+  "description": "A multipurpose small VM made as an experiment.",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yagarasu/nanofeather.git"
+  },
+  "author": "Alexys Hegmann 'Yagarasu'",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yagarasu/nanofeather/issues"
+  },
+  "homepage": "https://github.com/yagarasu/nanofeather#readme"
+}
