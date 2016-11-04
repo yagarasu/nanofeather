@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/yagarasu/nanofeather/issues"
   },
-  "homepage": "https://github.com/yagarasu/nanofeather#readme"
+  "homepage": "https://github.com/yagarasu/nanofeather#readme",
+  "dependencies": {
+    "browserify": "^13.1.1"
+  }
 }
