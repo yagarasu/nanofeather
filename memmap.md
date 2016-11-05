@@ -1,3 +1,4 @@
+#Memory mapping
 8000 bytes
 0x0000 - 0x1F40
 
