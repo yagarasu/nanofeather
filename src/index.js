@@ -1,3 +1,13 @@
-var Memory = require('./Memory');
+var CPU = require('./CPU');
 
-var memory = new Memory();
+var output = document.getElementById('output');
+var cpu = new CPU({
+  output: output
+});
+
+var program = new Uint8Array([
+  0x00
+]);
+
+cpu.loadProgram(program);
+cpu.run();
