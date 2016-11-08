@@ -4,6 +4,7 @@ var Screen = require('../Screen');
 
 var CPU = function (options) {
   this.memory = new Memory();
+  window.memory = this.memory;
   this.output = options.output;
   this.outputMemory = this.memory.getMap(0x1C1F, 800);
   this.screen = new Screen(output, this.outputMemory);
@@ -22,16 +23,104 @@ CPU.prototype.loadProgram = function (prog, offset) {
   }
 };
 
+CPU.prototype.getNextByte = function () {
+  console.log('getNextByte');
+  return this.memory.readMem(this.PC++);
+};
+
 CPU.prototype.step = function () {
-  var cmd = this.memory.readMem(this.PC);
-  switch (cmd) {
-    case 0x0000:
-      this.halt();
-      break;
-    default:
-      console.log('step', cmd);
-      this.PC++;
+  console.log('STEP', this.PC);
+  var cmd = this.getNextByte();
+  console.log(cmd.toString(2));
+  // 0x00 HLT
+  if (cmd == 0x00) {
+    this.halt();
+    return;
   }
+  // Prefix: 000xxxxx
+  if (cmd >> 5 === 0) {
+    console.log('Prefixed');
+  } else {
+    // Not prefixed
+    var op = (cmd & 0xE0) >> 5; // 1110 0000
+    var rr = (cmd & 0x18) >> 3; // 0001 1000
+    var mmm = cmd & 0x7; // 0000 0111
+    console.log('op', op.toString(2), 'rr', rr.toString(2), 'mmm', mmm.toString(2));
+    var arg;
+    if (mmm & 0x4 === 0) {
+      // Arg is reg
+      arg = mmm & 0x3; // 0000 0011
+    }
+    if (mmm & 0x4 === 4) {
+      // Arg is [B]
+      arg = this.memory.readMem(this.memory.readReg(1));
+    }
+    if (mmm & 0x5 === 5) {
+      // Arg is [B + offset]
+      var offset = this.getNextByte();
+      arg = this.memory.readMem(this.memory.readReg(1) + offset);
+    }
+    if (mmm & 0x6 === 6) {
+      // Arg is [const]
+      var constant = this.getNextByte();
+      arg = this.memory.readMem(constant);
+    }
+    if (mmm & 0x7 === 7) {
+      // Arg is const
+      arg = this.getNextByte();
+    }
+    // Parse op
+    switch (op) {
+      case 1:
+        // OR
+        this.memory.writeReg(
+          rr,
+          this.memory.readReg(rr) | arg
+        );
+        break;
+      case 2:
+        // AND
+        this.memory.writeReg(
+          rr,
+          this.memory.readReg(rr) & arg
+        );
+        break;
+      case 3:
+        // CMP
+        // var regCont = this.memory.readReg(rr);
+        break;
+      case 4:
+        // SUB
+        this.memory.writeReg(
+          rr,
+          this.memory.readReg(rr) - arg
+        );
+        break;
+      case 5:
+        // ADD
+        this.memory.writeReg(
+          rr,
+          this.memory.readReg(rr) | arg
+        );
+        break;
+      case 6:
+        // MOV reg, arg
+        this.memory.writeReg(rr, arg);
+        break;
+      case 7:
+        // MOV arg, reg
+        this.memory.writeMem(arg, rr);
+        break;
+      default:
+        throw new Error('Unknown sub-opcode:' + op);
+    }
+    return;
+  }
+  
+  // Default    
+  console.log('Default', cmd);
+  this.PC++;
+  return;
 };
 
 CPU.prototype.run = function () {
@@ -55,7 +144,15 @@ var Memory = function () {
   this._raw = new ArrayBuffer(8000);
   this.mem = new Uint8Array(this._raw, 0);
   this.registers = new Uint8Array(4);
+  this.flags = 0x0;
   this.length = 8000;
+  this.FLAG = {
+    CARRY: 0x80,
+    PARITY: 0x40,
+    ZERO: 0x20,
+    SIGN: 0x10,
+    OVERFLOW: 0x08
+  }
 };
 
 Memory.prototype.writeReg = function (reg, value) {
@@ -83,6 +180,21 @@ Memory.prototype.getMap = function (address, length) {
   if (address + length > this.mem.length) throw new Error('Memory length overflow');
   return new Uint8Array(this._raw, address, length);
 }
+
+Memory.prototype.getFlag = function (flag) {
+  if (FlagMap[flag] === undefined) throw new Error('Invalid flag');
+  return this.flags & FlagMap[flag];
+};
+
+Memory.prototype.setFlag = function (flag) {
+  if (FlagMap[flag] === undefined) throw new Error('Invalid flag');
+  this.flags = this.flags | FlagMap[flag];
+};
+
+Memory.prototype.resetFlag = function (flag) {
+  if (FlagMap[flag] === undefined) throw new Error('Invalid flag');
+  this.flags = this.flags & ~FlagMap[flag];
+};
 
 module.exports = Memory;
 
@@ -161,6 +273,12 @@ var cpu = new CPU({
   output: output
 });
 
+var program = new Uint8Array([
+  0b11000111, 0b00000101,
+  0b11001111, 0b00001010,
+]);
+
+cpu.loadProgram(program);
 cpu.run();
 
 },{"./CPU":1}]},{},[4]);

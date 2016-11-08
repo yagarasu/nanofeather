@@ -6,7 +6,8 @@ var cpu = new CPU({
 });
 
 var program = new Uint8Array([
-  0x00
+  0b11000111, 0b00000101,
+  0b11001111, 0b00001010,
 ]);
 
 cpu.loadProgram(program);
