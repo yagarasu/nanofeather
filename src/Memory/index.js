@@ -15,7 +15,7 @@ var Memory = function () {
 
 Memory.prototype.writeReg = function (reg, value) {
   if (reg >= this.registers.length) throw new Error('Invalid register');
-  this.registers[reg] = value;
+  return this.registers[reg] = value;
 };
 
 Memory.prototype.readReg = function (reg) {
@@ -25,7 +25,7 @@ Memory.prototype.readReg = function (reg) {
 
 Memory.prototype.writeMem = function (address, value) {
   if (address >= this.mem.length) throw new Error('Invalid memory location');
-  this.mem[address] = value;
+  return this.mem[address] = value;
 };
 
 Memory.prototype.readMem = function (address) {
@@ -40,18 +40,18 @@ Memory.prototype.getMap = function (address, length) {
 }
 
 Memory.prototype.getFlag = function (flag) {
-  if (FlagMap[flag] === undefined) throw new Error('Invalid flag');
-  return this.flags & FlagMap[flag];
+  if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  return this.flags & this.FLAG[flag];
 };
 
 Memory.prototype.setFlag = function (flag) {
-  if (FlagMap[flag] === undefined) throw new Error('Invalid flag');
-  this.flags = this.flags | FlagMap[flag];
+  if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  return this.flags = this.flags | this.FLAG[flag];
 };
 
 Memory.prototype.resetFlag = function (flag) {
-  if (FlagMap[flag] === undefined) throw new Error('Invalid flag');
-  this.flags = this.flags & ~FlagMap[flag];
+  if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  return this.flags = this.flags & ~this.FLAG[flag];
 };
 
 module.exports = Memory;

@@ -70,7 +70,7 @@ prefix          ii          mmm
                             101 JGE
                             110 JMP
                             111 - not assigned
-                10 - NOT    <same mmm as not exp>
+                10 - NOT    <same mmm as prev sec>
                 11 - not assigned
 
 
