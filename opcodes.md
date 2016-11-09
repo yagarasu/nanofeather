@@ -42,10 +42,10 @@ RET - return from subroutine
 
 0000 0000 HLT - 0x00
 
-1 byte instr (1 byte arg)
+1 byte instr (1 byte arg) iiir rmmm: aaaa aaaa
 
 iii             rr          mmm:
-000 - special
+000 - exp
 
 001 - OR        00 A        000 A
 010 - AND       01 B        001 B
@@ -55,4 +55,22 @@ iii             rr          mmm:
 110 - MOV rr, mmm           101 [reg + offset]
 111 - MOV mmm, rr           110 [const]
                             111 const
+
+Expansion set
+000i immm: aaaa aaaa
+
+prefix          ii          mmm
+000             00 - exp
+                01 - JMP                <address>
+                            000 JE
+                            001 JNE
+                            010 JL
+                            011 JLE
+                            100 JG
+                            101 JGE
+                            110 JMP
+                            111 - not assigned
+                10 - NOT    <same mmm as not exp>
+                11 - not assigned
+
 

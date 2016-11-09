@@ -37,41 +37,47 @@ CPU.prototype.step = function () {
     this.halt();
     return;
   }
-  // Prefix: 000xxxxx
-  if (cmd >> 5 === 0) {
-    console.log('Prefixed');
-  } else {
-    // Not prefixed
+  
+  // Not prefixed
+  if (cmd >> 5 !== 0) {
     var op = (cmd & 0xE0) >> 5; // 1110 0000
     var rr = (cmd & 0x18) >> 3; // 0001 1000
     var mmm = cmd & 0x7; // 0000 0111
     console.log('op', op.toString(2), 'rr', rr.toString(2), 'mmm', mmm.toString(2));
     var arg;
-    if (mmm & 0x4 === 0) {
+    if ((mmm & 0x4) === 0) {
+      console.log('Arg is reg');
       // Arg is reg
       arg = mmm & 0x3; // 0000 0011
+    } else {
+      if (mmm === 4) {
+        console.log('Arg is [B]')
+        // Arg is [B]
+        arg = this.memory.readMem(this.memory.readReg(1));
+      }
+      else if (mmm === 5) {
+        console.log('Arg is [B + offset]')
+        // Arg is [B + offset]
+        var offset = this.getNextByte();
+        arg = this.memory.readMem(this.memory.readReg(1) + offset);
+      }
+      else if (mmm === 6) {
+        console.log('Arg is [const]')
+        // Arg is [const]
+        var constant = this.getNextByte();
+        arg = this.memory.readMem(constant);
+      }
+      else if (mmm === 7) {
+        console.log('Arg is const')
+        // Arg is const
+        arg = this.getNextByte();
+      }
     }
-    if (mmm & 0x4 === 4) {
-      // Arg is [B]
-      arg = this.memory.readMem(this.memory.readReg(1));
-    }
-    if (mmm & 0x5 === 5) {
-      // Arg is [B + offset]
-      var offset = this.getNextByte();
-      arg = this.memory.readMem(this.memory.readReg(1) + offset);
-    }
-    if (mmm & 0x6 === 6) {
-      // Arg is [const]
-      var constant = this.getNextByte();
-      arg = this.memory.readMem(constant);
-    }
-    if (mmm & 0x7 === 7) {
-      // Arg is const
-      arg = this.getNextByte();
-    }
+    
     // Parse op
     switch (op) {
       case 1:
+        console.log('OR')
         // OR
         this.memory.writeReg(
           rr,
@@ -79,6 +85,7 @@ CPU.prototype.step = function () {
         );
         break;
       case 2:
+        console.log('AND')
         // AND
         this.memory.writeReg(
           rr,
@@ -86,10 +93,12 @@ CPU.prototype.step = function () {
         );
         break;
       case 3:
+        console.log('CMP')
         // CMP
         // var regCont = this.memory.readReg(rr);
         break;
       case 4:
+        console.log('SUB')
         // SUB
         this.memory.writeReg(
           rr,
@@ -97,22 +106,77 @@ CPU.prototype.step = function () {
         );
         break;
       case 5:
+        console.log('ADD')
         // ADD
         this.memory.writeReg(
           rr,
-          this.memory.readReg(rr) | arg
+          this.memory.readReg(rr) + arg
         );
         break;
       case 6:
+        console.log('MOV reg, arg', rr, arg)
         // MOV reg, arg
         this.memory.writeReg(rr, arg);
         break;
       case 7:
+        console.log('MOV arg, reg', rr, arg)
         // MOV arg, reg
-        this.memory.writeMem(arg, rr);
+        this.memory.writeMem(arg, this.memory.readReg(rr));
         break;
       default:
         throw new Error('Unknown sub-opcode:' + op);
+    }
+    return;
+  } else {
+    // Prefixed 000
+    var op = (cmd & 0x18) >> 3; // 1110 0000
+    var mmm = cmd & 0x7; // 0000 0111
+    console.log('op', op.toString(2), 'mmm', mmm.toString(2));
+    switch (op) {
+      case 1:
+        console.log('JMP', mmm)
+        // MOV reg, arg
+        break;
+      case 2:
+        console.log('NEG', mmm);
+        // NEG
+        if ((mmm & 0x4) === 0) {
+          console.log('Arg is reg');
+          // Arg is reg
+          var reg = mmm & 0x3; // 0000 0011
+          this.memory.writeReg(reg,
+            ~this.memory.readReg(reg)
+          )
+        } else {
+          console.log('not zero?');
+          if (mmm === 4) {
+            console.log('Arg is [B]')
+            // Arg is [B]
+            var arg = this.memory.readMem(this.memory.readReg(1));
+            this.memory.writeMem(this.memory.readReg(1), ~arg);
+          }
+          else if (mmm === 5) {
+            console.log('Arg is [B + offset]')
+            // Arg is [B + offset]
+            var offset = this.getNextByte();
+            var arg = this.memory.readMem(this.memory.readReg(1) + offset);
+            this.memory.writeMem(this.memory.readReg(1) + offset, ~arg);
+          }
+          else if (mmm === 6) {
+            console.log('Arg is [const]')
+            // Arg is [const]
+            var constant = this.getNextByte();
+            var arg = this.memory.readMem(constant);
+            this.memory.writeMem(constant, ~arg);
+          }
+          else if (mmm === 7) {
+            console.log('Arg is const')
+            throw new Error('Invalid NOT operation');
+          }
+        }
+        break;    
+      default:
+        throw new Error('Unknown sub-opcode:', op);
     }
     return;
   }
@@ -125,9 +189,12 @@ CPU.prototype.step = function () {
 
 CPU.prototype.run = function () {
   this.halted = false;
-  this.clock = setInterval(function () {
+  while (!this.halted) {
     this.step();
-  }.bind(this), 1000);
+    // this.clock = setInterval(function () {
+    //   this.step();
+    // }.bind(this), 1000);
+  }
 };
 
 CPU.prototype.halt = function () {
@@ -274,8 +341,11 @@ var cpu = new CPU({
 });
 
 var program = new Uint8Array([
-  0b11000111, 0b00000101,
-  0b11001111, 0b00001010,
+  0b11000111, 0b00000101, // MOV A, 5
+  0b11001111, 0b00001010, // MOV B, 10
+  0b11100111, 0b00001111, // MOV [0xFF], A
+  0b10101111, 0b00000010, // ADD A, 0x2
+  0b00010000  // NOT A
 ]);
 
 cpu.loadProgram(program);
