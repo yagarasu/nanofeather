@@ -7,37 +7,37 @@ Arg types
 <effective address of ref>
 
 -- halt
-HLT - Halt program
+[X]     HLT - Halt program
 -- data
-MOV - Move data from one point to other
-PUSH - Push data into stack
-POP - Pop data from stack
+[X]     MOV - Move data from one point to other
+[ ]     PUSH - Push data into stack
+[ ]     POP - Pop data from stack
 -- alu
-ADD - Add
-SUB - Substract
-INC - Increment
-DEC - Decrement
-MUL - Multiply *
-DIV - Divide *
-AND - Logical and
-OR - Logical or
-XOR - Logical exclusive or
-NOT - Negate (?)
-NEG - 2s comp
-SHL - Shift left
-SHR - Shift right
+[X]     ADD - Add
+[X]     SUB - Substract
+[ ]     INC - Increment
+[ ]     DEC - Decrement
+[ ]     MUL - Multiply *
+[ ]     DIV - Divide *
+[X]     AND - Logical and
+[X]     OR - Logical or
+[ ]     XOR - Logical exclusive or
+[ ]     NOT - Negate (?)
+[X]     NEG - 2s comp
+[ ]     SHL - Shift left
+[ ]     SHR - Shift right
 -- flow
-JMP - jump
-JE - jump if equal
-JNE - jump if not equal
-JZ - jump if zero
-JG - jump if greater than
-JGE - jump if greater than or equal
-JL - jump if lesser than
-JLE - jump if lesser than or equal
-CMP - compare
-CALL - call subroutine
-RET - return from subroutine
+[X]     JMP - jump
+[X]     JE - jump if equal
+[X]     JNE - jump if not equal
+[X]     JZ - jump if zero
+[X]     JG - jump if greater than
+[X]     JGE - jump if greater than or equal
+[X]     JL - jump if lesser than
+[X]     JLE - jump if lesser than or equal
+[X]     CMP - compare
+[ ]     CALL - call subroutine
+[ ]     RET - return from subroutine
 
 
 0000 0000 HLT - 0x00
