@@ -46,11 +46,13 @@ Memory.prototype.getFlag = function (flag) {
 
 Memory.prototype.setFlag = function (flag) {
   if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  console.log('Set flag:', flag)
   return this.flags = this.flags | this.FLAG[flag];
 };
 
 Memory.prototype.resetFlag = function (flag) {
   if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  console.log('Reset flag:', flag)
   return this.flags = this.flags & ~this.FLAG[flag];
 };
 

@@ -9,6 +9,15 @@ var log = function () {
   }
 };
 
+/*
+Opcode design:
+- http://www.c-jump.com/CIS77/CPU/IsaDesign/lecture.html
+Jumps:
+- http://unixwiz.net/techtips/x86-jumps.html
+On how the flags are set:
+- http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
+*/
+
 var CPU = function (options) {
   this.memory = new Memory();
   window.memory = this.memory;
@@ -115,35 +124,63 @@ CPU.prototype.step = function () {
         log('CMP')
         // CMP
         var regCont = this.memory.readReg(rr);
-        var r = regCont - arg;
-        this.setFlag('ZERO', (r === 0));
-        this.setFlag('PARITY', (r & 0x1) === 1);
+        var res = regCont - arg;
+        this.setFlag('ZERO', (res === 0));
+        this.setFlag('SIGN', (res >> 7));
+        this.setFlag('PARITY', (res & 0x1) === 1);
+        if (res > 255) {
+          this.setFlag('CARRY', true);
+          res = 0xFF;
+        } else {
+          this.setFlag('CARRY', false);
+        }
+        if (((regCont & 0x80) === (arg & 0x80)) && (res & 0x80) !== (regCont & 0x80)) {
+          this.setFlag('OVERFLOW', true);
+        } else {
+          this.setFlag('OVERFLOW', false);
+        }
         break;
       case 4:
         log('SUB')
         // SUB
-        var r = this.memory.writeReg(
-          rr,
-          this.memory.readReg(rr) - arg
-        );
+        var opA = this.memory.readReg(rr);
+        var res = opA - arg;
+        if (res > 255) {
+          this.setFlag('CARRY', true);
+          res = 0xFF;
+        } else {
+          this.setFlag('CARRY', false);
+        }
+        var r = this.memory.writeReg(rr, res);
         this.setFlag('ZERO', (r === 0));
         this.setFlag('SIGN', (r >> 7));
         this.setFlag('PARITY', (r & 0x1) === 1);
-        this.setFlag('CARRY', (r > 256));
-        this.setFlag('OVERFLOW', (r > 256));
+        if (((opA & 0x80) === (arg & 0x80)) && (r & 0x80) !== (opA & 0x80)) {
+          this.setFlag('OVERFLOW', true);
+        } else {
+          this.setFlag('OVERFLOW', false);
+        }
         break;
       case 5:
         log('ADD', rr, arg)
         // ADD
-        var r = this.memory.writeReg(
-          rr,
-          this.memory.readReg(rr) + arg
-        );
+        var opA = this.memory.readReg(rr);
+        var res = opA + arg;
+        if (res > 255) {
+          this.setFlag('CARRY', true);
+          res = 0xFF;
+        } else {
+          this.setFlag('CARRY', false);
+        }
+        this.memory.writeReg(rr, res);
         this.setFlag('ZERO', (r === 0));
         this.setFlag('SIGN', (r >> 7));
         this.setFlag('PARITY', (r & 0x1) === 1);
-        this.setFlag('CARRY', (r > 256));
-        this.setFlag('OVERFLOW', (r > 256));
+        if (((opA & 0x80) === (arg & 0x80)) && (r & 0x80) !== (opA & 0x80)) {
+          this.setFlag('OVERFLOW', true);
+        } else {
+          this.setFlag('OVERFLOW', false);
+        }
         break;
       case 6:
         log('MOV reg, arg', rr, arg)
@@ -188,18 +225,34 @@ CPU.prototype.step = function () {
         else if (mmm === 2) {
           // JL
           log('JL', addr);
+          if (this.memory.getFlag('SIGN') !== this.memory.getFlag('OVERFLOW')) {
+            this.PC = addr;
+          }
+          return;
         }
         else if (mmm === 3) {
           // JLE
           log('JLE', addr);
+          if (!this.memory.getFlag('CARRY') || this.memory.getFlag('ZERO')) {
+            this.PC = addr;
+          }
+          return;
         }
         else if (mmm === 4) {
           // JG
           log('JG', addr);
+          if (!this.memory.getFlag('ZERO') && (this.memory.getFlag('SIGN') === this.memory.getFlag('OVERFLOW'))) {
+            this.PC = addr;
+          }
+          return;
         }
         else if (mmm === 5) {
           // JGE
-          log('JGE', addr);  
+          log('JGE', addr);
+          if (this.memory.getFlag('SIGN') === this.memory.getFlag('OVERFLOW')) {
+            this.PC = addr;
+          }
+          return;
         }
         else if (mmm === 6) {
           // JMP
@@ -330,11 +383,13 @@ Memory.prototype.getFlag = function (flag) {
 
 Memory.prototype.setFlag = function (flag) {
   if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  console.log('Set flag:', flag)
   return this.flags = this.flags | this.FLAG[flag];
 };
 
 Memory.prototype.resetFlag = function (flag) {
   if (this.FLAG[flag] === undefined) throw new Error('Invalid flag ' + flag);
+  console.log('Reset flag:', flag)
   return this.flags = this.flags & ~this.FLAG[flag];
 };
 
@@ -418,16 +473,16 @@ var cpu = new CPU({
 window.cpu = cpu;
 
 var program = new Uint8Array([
-  // 0b11000111, 0b00000101, // MOV A, 5
-  // 0b11001111, 0b00001010, // MOV B, 10
-  // 0b11100111, 0b00001111, // MOV [0xFF], A
-  // 0b10100111, 0b00000010, // ADD A, 0x2
-  // //0b00010000,  // NOT A
-  // 0b00001110, 0b00000100  // JMP 0x4
+  // ADD test
+  // 0b11000111, 0b00001000, // MOV A, 8
+  // 0b10100111, 0b00001000, // ADD A, 8
+  // 0b00000000 // HLT
+  // // Flags should be on
   
+  // JMP test
   0b11000111, 0b00000101, // MOV A, 5
-  0b01100111, 0b00000111, // CMP A, 7
-  0b00001001, 0b00000111, // JNE 0x7
+  0b01100111, 0b00000001, // CMP A, 1
+  0b00001101, 0b00000111, // JG 0x7
   0b00000000, // HLT
   0b11001111, 0b00001111, // MOV B, 0xF
   0b00000000, // HLT
