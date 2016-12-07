@@ -21,3 +21,11 @@ _><"
 
 SUM bits    : 2480 bits     - 310 bytes
 SUM sprites : 62 sprites    - addr 0x00 - 0x3F
+
+====
+
+STDOUT:
+      20x4 chars (5x8)
+      
+      80 chars total
+      160 bytes (1 byte char + 1 byte attrib)

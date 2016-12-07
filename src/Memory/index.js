@@ -1,7 +1,7 @@
 var Memory = function () {
-  this._raw = new ArrayBuffer(8000);
-  this.mem = new Uint8Array(this._raw, 0);
-  this.registers = new Uint8Array(4);
+  this._raw = new ArrayBuffer(64000);
+  this.mem = new Uint16Array(this._raw, 0);
+  this.registers = new Uint16Array(4);
   this.flags = 0x0;
   this.length = 8000;
   this.FLAG = {
