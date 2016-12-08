@@ -7,9 +7,18 @@ var cpu = new CPU({
 
 window.cpu = cpu;
 
-var program = new Uint16Array([
-  
+cpu.memory.writeReg(0x0, 123);
+cpu.memory.writeReg(0x1, 1);
+
+var program = new Uint8Array([
+  0b00000001, // ADD r, r
+  0b00000000,
+  0b00000001,
+  // 0b00000010,
+  // 0b00000011,
+  // 0b00000100,
+  0b00000000
 ]);
 
 cpu.loadProgram(program);
-//cpu.run();
+cpu.run();

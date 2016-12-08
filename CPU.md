@@ -1,21 +1,35 @@
-#CPU
+# CPU
 
-Register based 16 bit machine (to make easier the addressing system).
+## Memory
+    - Registers
+    - 64k memory for program, data and stack
 
-4 GP 16 bit registers (A, B, C, D)
-8 bit words addressable as rH / rL
+Register based 8 bit machine.
+
+4 GP 8 bit registers (A, B, C, D)
+2 GP 16 bit registers (X, Y)
+    8 bit words addressable as rH / rL
 
 ```
      _______________________
-    |           A           |
+    |           X           |
     +-----------------------+
     | 0000 0000   0000 0000 |
     +-----------------------+
-    |     AH    |     AL    |
+    |     XH    |     XL    |
     +-----------------------+
 ```
 
-Flag register F addressable as F is 8 bits
+Register identifiers (opcodes):
+
+0000 0000 A
+0000 0001 B
+0000 0010 C
+0000 0011 D
+0000 0100 XH   X 0001 0100
+0000 0101 XL
+0000 0110 YH   Y 0001 0110
+0000 0111 YL
 
 Program counter (PC) is 16 bits
 Stack counter (SC) is 16 bits
