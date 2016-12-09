@@ -1,7 +1,17 @@
 #Screen
 
+## Text mode
+Size 100x32px @ 2 bits per pixel (4 colors)
+Memory address: 0xF6E0 - 0xFA00
+      800 bytes
+      
+      Each byte represents:
+      s: status
+      c: char
+      ss cc cccc
+
 Size: 100x32px @ 2 bits per pixel (4 colors)
-Memory address: 0x1C20 - 0x1F40
+Memory address: 0xF6E0 - 0xFA00
       800 bytes
 
 Size: 100x32px @ 1 bits per pixel (2 colors)

@@ -1,3 +1,10 @@
+var WIDTH = 100,
+    HEIGHT = 32,
+    COLOR_BLACK = '#000000',
+    COLOR_WHITE = '#FFFFFF',
+    COLOR_GREEN = '#00AA00',
+    COLOR_RED = '#AA0000';
+
 var Screen = function (outputElement, screenMem) {
   this.pxSize = 4;
   this.el = outputElement;
@@ -7,8 +14,8 @@ var Screen = function (outputElement, screenMem) {
 };
 
 Screen.prototype.setupElement = function () {
-  this.el.width = this.realPxToscrPx(100).toString();
-  this.el.height = this.realPxToscrPx(32).toString();
+  this.el.width = this.realPxToscrPx(WIDTH).toString();
+  this.el.height = this.realPxToscrPx(HEIGHT).toString();
   this.clear();
 };
 
@@ -21,16 +28,15 @@ Screen.prototype.scrPxTorealPx = function (px) {
 };
 
 Screen.prototype.clear = function () {
-  // @todo
+  this.ctx.fillStyle = COLOR_BLACK;
+  this.ctx.fillRect(0, 0, this.realPxToscrPx(WIDTH), this.realPxToscrPx(HEIGHT));
 };
 
 Screen.prototype.render = function () {
   for (var o = 0; o < this.mem.length; o++) {
     var cbyte = this.mem[o],
-        h = (cbyte & 0xFF00) >> 8,
-        l = (cbyte & 0x00FF);
-    var char = String.fromCharCode(h);
-    // @todo
+      status = (cbyte & 0b11000000) >> 6,
+      char = (cbyte & 0b00111111);
   }
 };
 

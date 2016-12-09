@@ -1,6 +1,6 @@
 var opcodes = require('./opcodes');
 var Memory = require('../Memory');
-//var Screen = require('../Screen');
+var Screen = require('../Screen');
 
 var log = function () {
   var debug = true;
@@ -13,10 +13,10 @@ var log = function () {
 var CPU = function (options) {
   this.memory = new Memory();
   window.memory = this.memory;
-  // this.output = options.output;
-  // this.outputMemory = this.memory.getMap(0x1C1F, 800);
-  // this.screen = new Screen(this.output, this.outputMemory);
-  // this.screen.render();
+  this.output = options.output;
+  this.outputMemory = this.memory.getMap(0xF6E0, 800);
+  this.screen = new Screen(this.output, this.outputMemory);
+  this.screen.render();
   this.PC = 0x0000;
   this.SP = 0x1C1F;
   this.flags = {

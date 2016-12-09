@@ -1,7 +1,7 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var opcodes = require('./opcodes');
 var Memory = require('../Memory');
-//var Screen = require('../Screen');
+var Screen = require('../Screen');
 
 var log = function () {
   var debug = true;
@@ -14,10 +14,10 @@ var log = function () {
 var CPU = function (options) {
   this.memory = new Memory();
   window.memory = this.memory;
-  // this.output = options.output;
-  // this.outputMemory = this.memory.getMap(0x1C1F, 800);
-  // this.screen = new Screen(this.output, this.outputMemory);
-  // this.screen.render();
+  this.output = options.output;
+  this.outputMemory = this.memory.getMap(0xF6E0, 800);
+  this.screen = new Screen(this.output, this.outputMemory);
+  this.screen.render();
   this.PC = 0x0000;
   this.SP = 0x1C1F;
   this.flags = {
@@ -253,7 +253,7 @@ CPU.prototype.step = function () {
         }
         break;
         
-      case 'JGE': // BUGGGED!
+      case 'JGE':
         var addr = this.getNextArgValue(parsed.arg1type);
         if (this.flags.carry || this.flags.zero) {
           this.PC = addr;
@@ -347,7 +347,7 @@ CPU.prototype.setFlagsBit = function (A, B, res) {
 };
 
 module.exports = CPU;
-},{"../Memory":3,"./opcodes":2}],2:[function(require,module,exports){
+},{"../Memory":3,"../Screen":4,"./opcodes":2}],2:[function(require,module,exports){
 var opcodes = [
   'HLT',
   'ADD_R_R',
@@ -504,6 +504,55 @@ Memory.prototype.getMap = function (address, length) {
 module.exports = Memory;
 
 },{}],4:[function(require,module,exports){
+var WIDTH = 100,
+    HEIGHT = 32,
+    COLOR_BLACK = '#000000',
+    COLOR_WHITE = '#FFFFFF',
+    COLOR_GREEN = '#00AA00',
+    COLOR_RED = '#AA0000';
+
+var Screen = function (outputElement, screenMem) {
+  this.pxSize = 4;
+  this.el = outputElement;
+  this.ctx = this.el.getContext('2d');
+  this.setupElement();
+  this.mem = screenMem;
+};
+
+Screen.prototype.setupElement = function () {
+  this.el.width = this.realPxToscrPx(WIDTH).toString();
+  this.el.height = this.realPxToscrPx(HEIGHT).toString();
+  this.clear();
+};
+
+Screen.prototype.realPxToscrPx = function (px) {
+  return px * 4;
+};
+
+Screen.prototype.scrPxTorealPx = function (px) {
+  return Math.floor(px / 4);
+};
+
+Screen.prototype.clear = function () {
+  this.ctx.fillStyle = COLOR_BLACK;
+  this.ctx.fillRect(0, 0, this.realPxToscrPx(WIDTH), this.realPxToscrPx(HEIGHT));
+  
+  this.ctx.fillStyle = COLOR_GREEN;
+  this.ctx.fillRect(0, 0, this.realPxToscrPx(1), this.realPxToscrPx(1));
+};
+
+Screen.prototype.render = function () {
+  for (var o = 0; o < this.mem.length; o++) {
+    var cbyte = this.mem[o],
+        h = (cbyte & 0xF0) >> 4,
+        l = (cbyte & 0x0F);
+    console.log(h, l);
+  }
+};
+
+module.exports = Screen;
+
+},{}],5:[function(require,module,exports){
 var CPU = require('./CPU');
 
 var output = document.getElementById('output');
@@ -513,27 +562,20 @@ var cpu = new CPU({
 
 window.cpu = cpu;
 
-// cpu.memory.writeReg(0b00000101, 0x3C);
-// cpu.memory.writeReg(0b00000100, 0xA5);
-cpu.memory.writeReg(0x0, 0x10);
-cpu.memory.writeReg(0x1, 0x10);
-// cpu.memory.writeMem(0x10, 20);
-// cpu.memory.writeMem(257, 40);
+// cpu.memory.writeReg(0x0, 0x10);
+// cpu.memory.writeReg(0x1, 0x10);
+
+for (var i = 0xF6E0; i < 0xFA00; i += 2) {
+  cpu.memory.writeMem(i, 0x2);
+}
+
+cpu.screen.render();
 
 var program = new Uint8Array([
-  
-  42, 0, 0xFF,// MOV A, 0xFF
-  79, 9, // CALL 0x9
-  42, 1, 0xFF,// MOV B, 0xFF
-  0, // HLT
-  
-  42, 0, 0x0F,// MOV A, 0x0F
-  80,
-  
   0  // HLT
 ]);
 
 cpu.loadProgram(program);
-cpu.run();
+// cpu.run();
 
-},{"./CPU":1}]},{},[4]);
+},{"./CPU":1}]},{},[5]);
