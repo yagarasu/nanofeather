@@ -22,10 +22,21 @@ for (var i = 0xF6E0; i < 0xFA00; i++) {
 //cpu.screen.render();
 
 var program = new Uint8Array([
-  17, 0,
-  76, 0, 255,
-  60, 0,
-  0  // HLT
+  
+  // Print chartmap in screen
+  42, 4, 0xE0,  // MOV XL, 0xE0
+  42, 5, 0xF6,  // MOV XH, 0xF6
+  
+  17, 0,        // INC A
+  39, 1, 0,     // MOV B, A
+  26, 1, 0xC0,  // OR B, 0xC0
+  43, 20, 1,    // MOV [X], B
+  17, 20,       // INC X
+  
+  76, 0, 63,    // CMP A, 63
+  60, 6,        // JNE 0x6
+  0             // HLT
+
 ]);
 
 cpu.loadProgram(program);

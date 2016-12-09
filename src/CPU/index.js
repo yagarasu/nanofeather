@@ -15,8 +15,11 @@ var CPU = function (options) {
   this.memory = new Memory();
   window.memory = this.memory;
   
-  this.clock = new Clock(200);
+  this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
+  this.clock.on('tick', function () {
+    console.log(this.memory.regs8);
+  }.bind(this));
   this.clock.on('start', function () { log('Clock started.'); });
   this.clock.on('stop', function () { log('Clock stopped.'); });
   
@@ -75,7 +78,11 @@ CPU.prototype.step = function () {
         var reg = this.getNextByte();
         var regCont = this.memory.readReg(reg);
         var res = regCont + 1;
-        res = this.setFlagsMath(regCont, 1, res);
+        if (reg <= 0xF) {
+          res = this.setFlagsMath(regCont, 1, res);  
+        } else {
+          res = this.setFlagsMath16(regCont, 1, res);  
+        }
         log('INC', reg, '=', res);
         this.memory.writeReg(reg, res);
         break;
@@ -84,7 +91,11 @@ CPU.prototype.step = function () {
         var reg = this.getNextByte();
         var regCont = this.memory.readReg(reg);
         var res = regCont - 1;
-        res = this.setFlagsMath(regCont, 1, res);
+        if (reg <= 0xF) {
+          res = this.setFlagsMath(regCont, 1, res);  
+        } else {
+          res = this.setFlagsMath16(regCont, 1, res);  
+        }
         log('DEC', reg, '=', res);
         this.memory.writeReg(reg, res);
         break;
@@ -162,6 +173,7 @@ CPU.prototype.step = function () {
         var res = regCont | arg2;
         log('OR', regA, regCont, '|', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
+        console.log(res);
         this.memory.writeReg(regA, res);
         break;
       
@@ -340,7 +352,22 @@ CPU.prototype.setFlagsMath = function (A, B, res) {
     this.flags.carry = false;
   }
   log('FLAGS:', this.flags);
-  return res
+  return res;
+};
+
+CPU.prototype.setFlagsMath16 = function (A, B, res) {
+  this.flags.zero = (res === 0);
+  this.flags.sign = (res >> 7) > 0;
+  this.flags.parity = !!(res & 0x1);
+  this.flags.overflow = ((A & 0x8000) === (B & 0x8000)) && (res & 0x8000) !== (A & 0x8000);
+  if (res > 0xFFFF || res < 0) {
+    this.flags.carry = true;
+    res = res && 0xFFFF;
+  } else {
+    this.flags.carry = false;
+  }
+  log('FLAGS:', this.flags);
+  return res;
 };
 
 CPU.prototype.setFlagsBit = function (A, B, res) {
@@ -348,6 +375,7 @@ CPU.prototype.setFlagsBit = function (A, B, res) {
   this.flags.sign = (res >> 7) > 0;
   this.flags.parity = (res & 0x1);
   log('FLAGS:', this.flags);
+  return res;
 };
 
 module.exports = CPU;
