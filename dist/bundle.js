@@ -520,6 +520,10 @@ var CHARMAP = [
   'P','Q','R','S','T','U','V','W','X','Y','Z','@','#','$','%','&'
 ];
 
+var memPerPageByMode = {
+  0x0: 80
+};
+
 var Screen = function (outputElement, screenMem) {
   this.pxSize = 4;
   this.el = outputElement;
@@ -527,12 +531,18 @@ var Screen = function (outputElement, screenMem) {
   this.setupElement();
   this.mem = screenMem;
   this.mode = MODE_TEXT;
+  this.memBase = 0;
+  this.memPerPage = memPerPageByMode[this.mode];
 };
 
 Screen.prototype.setupElement = function () {
   this.el.width = this.realPxToscrPx(WIDTH).toString();
   this.el.height = this.realPxToscrPx(HEIGHT).toString();
   this.clear();
+};
+
+Screen.prototype.setMemBase = function (offset) {
+  this.memBase = offset;
 };
 
 Screen.prototype.realPxToscrPx = function (px) {
@@ -548,7 +558,15 @@ Screen.prototype.clear = function () {
   this.ctx.fillRect(0, 0, this.realPxToscrPx(WIDTH), this.realPxToscrPx(HEIGHT));
 };
 
-Screen.prototype.render = function () {
+Screen.prototype.setMode = function (mode) {
+  this.clear();
+  this.memBase = 0;
+  
+  this.mode = mode;
+};
+
+Screen.prototype.render = function (noClear) {
+  if (!noClear) { this.clear(); }
   switch (this.mode) {
     case MODE_TEXT:
       this.renderText();
@@ -561,8 +579,9 @@ Screen.prototype.render = function () {
 Screen.prototype.renderText = function () {
   this.ctx.font = this.realPxToscrPx(8) + 'px monospace';
   this.ctx.textBaseline = "top";
-  for (var o = 0; o < 80; o++) {
-    var cbyte = this.mem[o],
+  for (var o = 0; o < this.memPerPage; o++) {
+    var offset = o + this.memBase,
+      cbyte = this.mem[offset],
       status = (cbyte & 0b11000000) >> 6,
       char = (cbyte & 0b00111111),
       str = CHARMAP[char],

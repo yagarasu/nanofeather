@@ -3,7 +3,7 @@
 ## Text mode
 Size 100x32px @ 2 bits per pixel (4 colors)
 Memory address: 0xF6E0 - 0xFA00
-      800 bytes
+      800 bytes = 10 pags
       
       Each byte represents:
       s: status
