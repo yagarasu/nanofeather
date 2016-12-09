@@ -1,6 +1,7 @@
 var opcodes = require('./opcodes');
 var Memory = require('../Memory');
 var Screen = require('../Screen');
+var Clock = require('./Clock');
 
 var log = function () {
   var debug = true;
@@ -13,10 +14,17 @@ var log = function () {
 var CPU = function (options) {
   this.memory = new Memory();
   window.memory = this.memory;
+  
+  this.clock = new Clock(200);
+  this.clock.on('tick', this.step.bind(this));
+  this.clock.on('start', function () { log('Clock started.'); });
+  this.clock.on('stop', function () { log('Clock stopped.'); });
+  
   this.output = options.output;
   this.outputMemory = this.memory.getMap(0xF6E0, 800);
   this.screen = new Screen(this.output, this.outputMemory);
-  this.screen.render();
+  this.clock.on('tick', function () { this.screen.render(); }.bind(this));
+  
   this.PC = 0x0000;
   this.SP = 0x1C1F;
   this.flags = {
@@ -27,8 +35,6 @@ var CPU = function (options) {
     overflow: false
   };
   this.halted = true;
-  this.timer = null;
-  this.speed = 1000;
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -45,14 +51,13 @@ CPU.prototype.getNextByte = function () {
 };
 
 CPU.prototype.halt = function () {
-  clearInterval(this.timer);
-  this.timer = null;
+  this.clock.stop();
   this.halted = true;
 };
 
 CPU.prototype.run = function () {
   this.halted = false;
-  this.timer = setInterval(this.step.bind(this), this.speed);
+  this.clock.start();
 };
 
 CPU.prototype.step = function () {

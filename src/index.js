@@ -18,12 +18,15 @@ for (var i = 0xF6E0; i < 0xFA00; i++) {
       char = (st << 6) + ch;
   cpu.memory.writeMem(i, char);
 }
-console.log('====== RENDER =====');
-cpu.screen.render();
+//console.log('====== RENDER =====');
+//cpu.screen.render();
 
 var program = new Uint8Array([
+  17, 0,
+  76, 0, 255,
+  60, 0,
   0  // HLT
 ]);
 
 cpu.loadProgram(program);
-// cpu.run();
+cpu.run();

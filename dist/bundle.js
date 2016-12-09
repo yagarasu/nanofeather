@@ -1,7 +1,50 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var Clock = function (speed) {
+  this.events = {};
+  this.speed = speed;
+  this.timer = null;
+};
+
+Clock.prototype.on = function (event, callback) {
+  if (this.events[event]) {
+    this.events[event].push(callback);
+  } else {
+    this.events[event] = [callback];
+  }
+};
+
+Clock.prototype.trigger = function (event, data) {
+  if (this.events[event]) {
+    for (var i = 0; i < this.events[event].length; i++) {
+      var stopPropagation = false,
+        fnStopPropagation = function () { stopPropagation = true; };
+      this.events[event][i](data, fnStopPropagation);
+      if (stopPropagation) break;
+    }
+  }
+};
+
+Clock.prototype.tick = function () {
+  this.trigger('tick');
+};
+
+Clock.prototype.start = function () {
+  this.timer = setInterval(this.tick.bind(this), this.speed);
+  this.trigger('start');
+};
+
+Clock.prototype.stop = function () {
+  clearInterval(this.timer);
+  this.timer = null;
+  this.trigger('stop');
+};
+
+module.exports = Clock;
+},{}],2:[function(require,module,exports){
 var opcodes = require('./opcodes');
 var Memory = require('../Memory');
 var Screen = require('../Screen');
+var Clock = require('./Clock');
 
 var log = function () {
   var debug = true;
@@ -14,10 +57,17 @@ var log = function () {
 var CPU = function (options) {
   this.memory = new Memory();
   window.memory = this.memory;
+  
+  this.clock = new Clock(200);
+  this.clock.on('tick', this.step.bind(this));
+  this.clock.on('start', function () { log('Clock started.'); });
+  this.clock.on('stop', function () { log('Clock stopped.'); });
+  
   this.output = options.output;
   this.outputMemory = this.memory.getMap(0xF6E0, 800);
   this.screen = new Screen(this.output, this.outputMemory);
-  this.screen.render();
+  this.clock.on('tick', function () { this.screen.render(); }.bind(this));
+  
   this.PC = 0x0000;
   this.SP = 0x1C1F;
   this.flags = {
@@ -28,8 +78,6 @@ var CPU = function (options) {
     overflow: false
   };
   this.halted = true;
-  this.timer = null;
-  this.speed = 1000;
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -46,14 +94,13 @@ CPU.prototype.getNextByte = function () {
 };
 
 CPU.prototype.halt = function () {
-  clearInterval(this.timer);
-  this.timer = null;
+  this.clock.stop();
   this.halted = true;
 };
 
 CPU.prototype.run = function () {
   this.halted = false;
-  this.timer = setInterval(this.step.bind(this), this.speed);
+  this.clock.start();
 };
 
 CPU.prototype.step = function () {
@@ -347,7 +394,7 @@ CPU.prototype.setFlagsBit = function (A, B, res) {
 };
 
 module.exports = CPU;
-},{"../Memory":3,"../Screen":4,"./opcodes":2}],2:[function(require,module,exports){
+},{"../Memory":4,"../Screen":5,"./Clock":1,"./opcodes":3}],3:[function(require,module,exports){
 var opcodes = [
   'HLT',
   'ADD_R_R',
@@ -440,7 +487,7 @@ module.exports = {
   }, {}),
   bcs: opcodes
 };
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 var Memory = function () {
   this._raw = new ArrayBuffer(64000);
   this.mem = new Uint8Array(this._raw, 0);
@@ -503,7 +550,7 @@ Memory.prototype.getMap = function (address, length) {
 
 module.exports = Memory;
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 var WIDTH = 100,
     HEIGHT = 32,
     COLOR_BLACK = '#000000',
@@ -594,7 +641,7 @@ Screen.prototype.renderText = function () {
 
 module.exports = Screen;
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 var CPU = require('./CPU');
 
 var output = document.getElementById('output');
@@ -615,14 +662,17 @@ for (var i = 0xF6E0; i < 0xFA00; i++) {
       char = (st << 6) + ch;
   cpu.memory.writeMem(i, char);
 }
-console.log('====== RENDER =====');
-cpu.screen.render();
+//console.log('====== RENDER =====');
+//cpu.screen.render();
 
 var program = new Uint8Array([
+  17, 0,
+  76, 0, 255,
+  60, 0,
   0  // HLT
 ]);
 
 cpu.loadProgram(program);
-// cpu.run();
+cpu.run();
 
-},{"./CPU":1}]},{},[5]);
+},{"./CPU":2}]},{},[6]);
