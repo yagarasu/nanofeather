@@ -3,10 +3,12 @@ var Memory = require('../Memory');
 var Screen = require('../Screen');
 var Clock = require('./Clock');
 
+
+
 var log = function () {
   var debug = true;
   if (debug) {
-    var args = Array.slice(arguments);
+    var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
   }
 };
