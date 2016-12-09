@@ -26,10 +26,10 @@ Register identifiers (opcodes):
 0000 0001 B
 0000 0010 C
 0000 0011 D
-0000 0100 XH   X 0001 0100
-0000 0101 XL
-0000 0110 YH   Y 0001 0110
-0000 0111 YL
+0000 0100 XL   X 0001 0100
+0000 0101 XH
+0000 0110 YL   Y 0001 0110
+0000 0111 YH
 
 Program counter (PC) is 16 bits
 Stack counter (SC) is 16 bits

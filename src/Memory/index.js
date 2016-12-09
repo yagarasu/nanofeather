@@ -4,23 +4,22 @@ var Memory = function () {
   this._registers = new ArrayBuffer(8);
   this.regs8 = new Uint8Array(this._registers, 0);
   this.regs16 = new Uint16Array(this._registers, 4);
-  this.flags = {
-    carry: false,
-    parity: false,
-    zero: false,
-    sign: false,
-    overflow: false
-  };
 };
 
 Memory.prototype.writeReg = function (reg, value) {
-  if (reg > 0xF) this.writeReg16((reg & 0xF), value);
+  if (reg > 0xF) {
+    var regNum = Math.floor(((reg & 0xF) / 2) - 2);
+    return this.writeReg16(regNum, value);
+  }
   return this.writeReg8(reg, value);
 };
 
-Memory.prototype.readReg = function (reg, value) {
-  if (reg > 0xF) this.readReg16((reg & 0xF), value);
-  return this.readReg8(reg, value);
+Memory.prototype.readReg = function (reg) {
+  if (reg > 0xF) {
+    var regNum = Math.floor(((reg & 0xF) / 2) - 2);
+    return this.readReg16(regNum);
+  }
+  return this.readReg8(reg);
 };
 
 Memory.prototype.writeReg8 = function (reg, value) {
@@ -40,7 +39,7 @@ Memory.prototype.writeReg16 = function (reg, value) {
 
 Memory.prototype.readReg16 = function (reg) {
   if (reg >= this.regs16.length) throw new Error('Invalid register');
-  return this.regs16[reg];
+  return this.regs16[reg]
 };
 
 Memory.prototype.writeMem = function (address, value) {
