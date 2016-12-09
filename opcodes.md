@@ -25,7 +25,6 @@
 - JMP (rr|mm|cc) - jump                             3
 - JE  (rr|mm|cc) - jump if equal                    3
 - JNE (rr|mm|cc) - jump if not equal                3
-- JZ  (rr|mm|cc) - jump if zero                     3
 - JG  (rr|mm|cc) - jump if greater than             3
 - JGE (rr|mm|cc) - jump if greater than or equal    3
 - JL  (rr|mm|cc) - jump if lesser than              3

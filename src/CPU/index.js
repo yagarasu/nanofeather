@@ -230,7 +230,60 @@ CPU.prototype.step = function () {
         var addr = this.getNextArgValue(parsed.arg1type);
         this.PC = addr;
         break;
-      
+        
+      case 'JE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JNE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (!this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JG':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.sign !== this.flags.overflow) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JGE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.carry || this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JL':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (!this.flags.zero && (this.flags.sign === this.flags.overflow)) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JLE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.sign === this.flags.overflow) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'CALL':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        this.memory.writeMem(this.SP--, this.PC);
+        this.PC = addr;
+        break;
+        
+      case 'RET':
+        var addr = this.memory.readMem(++this.SP);
+        this.PC = addr;
+        break;
+        
       default:
         log('Not implemented yet:' + parsed.cmd);
     }
@@ -275,7 +328,7 @@ CPU.prototype.setFlagsMath = function (A, B, res) {
   this.flags.sign = (res >> 7) > 0;
   this.flags.parity = !!(res & 0x1);
   this.flags.overflow = ((A & 0x80) === (B & 0x80)) && (res & 0x80) !== (A & 0x80);
-  if (res > 255) {
+  if (res > 255 || res < 0) {
     this.flags.carry = true;
     res = res && 0xFF;
   } else {

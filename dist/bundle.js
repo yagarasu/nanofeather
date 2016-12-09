@@ -231,7 +231,60 @@ CPU.prototype.step = function () {
         var addr = this.getNextArgValue(parsed.arg1type);
         this.PC = addr;
         break;
-      
+        
+      case 'JE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JNE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (!this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JG':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.sign !== this.flags.overflow) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JGE': // BUGGGED!
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.carry || this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JL':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (!this.flags.zero && (this.flags.sign === this.flags.overflow)) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JLE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.sign === this.flags.overflow) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'CALL':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        this.memory.writeMem(this.SP--, this.PC);
+        this.PC = addr;
+        break;
+        
+      case 'RET':
+        var addr = this.memory.readMem(++this.SP);
+        this.PC = addr;
+        break;
+        
       default:
         log('Not implemented yet:' + parsed.cmd);
     }
@@ -276,7 +329,7 @@ CPU.prototype.setFlagsMath = function (A, B, res) {
   this.flags.sign = (res >> 7) > 0;
   this.flags.parity = !!(res & 0x1);
   this.flags.overflow = ((A & 0x80) === (B & 0x80)) && (res & 0x80) !== (A & 0x80);
-  if (res > 255) {
+  if (res > 255 || res < 0) {
     this.flags.carry = true;
     res = res && 0xFF;
   } else {
@@ -350,26 +403,32 @@ var opcodes = [
   'POP_R',
   'JMP_RA',
   'JMP_A',
+  'JMP_C',
   'JE_RA',
   'JE_A',
+  'JE_C',
   'JNE_RA',
   'JNE_A',
-  'JZ_RA',
-  'JZ_A',
+  'JNE_C',
   'JG_RA',
   'JG_A',
+  'JG_C',
   'JGE_RA',
   'JGE_A',
+  'JGE_C',
   'JL_RA',
   'JL_A',
+  'JL_C',
   'JLE_RA',
   'JLE_A',
+  'JLE_C',
   'CMP_R_R',
   'CMP_R_RA',
   'CMP_R_A',
   'CMP_R_C',
   'CALL_RA',
   'CALL_A',
+  'CALL_C',
   'RET'
 ];
 
@@ -456,23 +515,22 @@ window.cpu = cpu;
 
 // cpu.memory.writeReg(0b00000101, 0x3C);
 // cpu.memory.writeReg(0b00000100, 0xA5);
-cpu.memory.writeReg(0x1, 0x3);
+cpu.memory.writeReg(0x0, 0x10);
+cpu.memory.writeReg(0x1, 0x10);
 // cpu.memory.writeMem(0x10, 20);
 // cpu.memory.writeMem(257, 40);
 
 var program = new Uint8Array([
   
-  47, 1,
-  48, 1,
-  49, 0, 2,
-  50, 10,
+  42, 0, 0xFF,// MOV A, 0xFF
+  79, 9, // CALL 0x9
+  42, 1, 0xFF,// MOV B, 0xFF
+  0, // HLT
   
-  51, 0,
-  51, 2,
-  51, 3,
-  51, 4,
+  42, 0, 0x0F,// MOV A, 0x0F
+  80,
   
-  0b00000000
+  0  // HLT
 ]);
 
 cpu.loadProgram(program);
