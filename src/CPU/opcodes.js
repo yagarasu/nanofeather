@@ -79,7 +79,8 @@ var opcodes = [
   'CALL_RA',
   'CALL_A',
   'CALL_C',
-  'RET'
+  'RET',
+  'INT'
 ];
 
 module.exports = {

@@ -1,11 +1,12 @@
 var CPU = require('./CPU');
+var sysInts = require('./SysInts');
 
 var output = document.getElementById('output');
 var cpu = new CPU({
   output: output
 });
 
-window.cpu = cpu;
+cpu.assignInterrupt(0x1, sysInts)
 
 // cpu.memory.writeReg(0x0, 0x10);
 // cpu.memory.writeReg(0x1, 0x10);
@@ -32,23 +33,14 @@ var program = new Uint8Array([
      
   // Start program
   
-  42, 4, 0xE0,  // MOV XL, 0xE0 ; Set X to Screen mem
-  42, 5, 0xF6,  // MOV XH, 0xF6
-  
-  42, 0, 0x02,  // MOV A, 0x02  ; point string to A
-  
-  40, 1, 0,     // MOV B, [A]   ; Add color flags
-  76, 1, 0,     // CMP B, 0     ; Compare char with null
-  57, 0x2C,     // JE 0x2C      ; Jump out of loop if null found
-  26, 1, 0xC0,  // OR B, 0xC0   ;  to char into B from A pointer
-  43, 20, 1,    // MOV [X], B   ; Print char to screen
-  17, 20,       // INC X        ; Increment screen pointer
-  17, 0,        // INC A        ; Increment string pointer
-  54, 0x18,     // JMP 0x18     ; Jump back to the loop
+  42, 4, 0x02,  // MOV XL, 0xE0 ; Set X to string
+  42, 0, 0x0,   // MOV A, 0x02  ; Set INT 0x1 argument to 0x0 (console log);
+  81, 0x1,      // INT 0x1      ; Call INT 01
   
   0,            // HLT
 
 ]);
 
+window.cpu = cpu;
 cpu.loadProgram(program);
 cpu.run();

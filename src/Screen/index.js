@@ -28,6 +28,7 @@ var Screen = function (outputElement, screenMem) {
   this.mode = MODE_TEXT;
   this.memBase = 0;
   this.memPerPage = memPerPageByMode[this.mode];
+  this.charmap = CHARMAP;
 };
 
 Screen.prototype.setupElement = function () {

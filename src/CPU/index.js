@@ -3,10 +3,15 @@ var Memory = require('../Memory');
 var Screen = require('../Screen');
 var Clock = require('./Clock');
 
-
+/*
+Jumps:
+- http://unixwiz.net/techtips/x86-jumps.html
+On how the flags are set:
+- http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
+*/
 
 var log = function () {
-  var debug = true;
+  var debug = false;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
@@ -19,19 +24,19 @@ var CPU = function (options) {
   
   this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
-  this.clock.on('tick', function () {
-    console.log(this.memory.regs8);
-  }.bind(this));
   this.clock.on('start', function () { log('Clock started.'); });
   this.clock.on('stop', function () { log('Clock stopped.'); });
   
   this.output = options.output;
   this.outputMemory = this.memory.getMap(0xF6E0, 800);
   this.screen = new Screen(this.output, this.outputMemory);
+  this.screen.clear();
   this.clock.on('tick', function () { this.screen.render(); }.bind(this));
   
+  this.interrupts = {};
+  
   this.PC = 0x0000;
-  this.SP = 0x1C1F;
+  this.SP = this.SBP = 0x1C1F;
   this.flags = {
     carry: false,
     parity: false,
@@ -40,6 +45,17 @@ var CPU = function (options) {
     overflow: false
   };
   this.halted = true;
+};
+
+CPU.prototype.assignInterrupt = function (iden, interrupt) {
+  this.interrupts[iden] = interrupt;
+};
+
+CPU.prototype.callInterrupt = function (iden) {
+  log('callInterrupt');
+  this.clock.stop();
+  this.interrupts[iden].call(this, this.memory, this.PC, this.SP);
+  this.clock.start();
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -175,7 +191,6 @@ CPU.prototype.step = function () {
         var res = regCont | arg2;
         log('OR', regA, regCont, '|', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
-        console.log(res);
         this.memory.writeReg(regA, res);
         break;
       
@@ -301,6 +316,11 @@ CPU.prototype.step = function () {
       case 'RET':
         var addr = this.memory.readMem(++this.SP);
         this.PC = addr;
+        break;
+        
+      case 'INT':
+        var interrupt = this.getNextByte();
+        this.callInterrupt(interrupt);
         break;
         
       default:

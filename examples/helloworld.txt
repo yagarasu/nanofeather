@@ -15,7 +15,7 @@
   40, 1, 0,     // MOV B, [A]   ; Add color flags
   76, 1, 0,     // CMP B, 0     ; Compare char with null
   57, 0x2C,     // JE 0x2C      ; Jump out of loop if null found
-  26, 1, 0xC0,  // OR B, 0xC0   ;  to char into B from A pointer
+  26, 1, 0xC0,  // OR B, 0xC0   ;  to char into B from A pointer  | 0b1100 0000
   43, 20, 1,    // MOV [X], B   ; Print char to screen
   17, 20,       // INC X        ; Increment screen pointer
   17, 0,        // INC A        ; Increment string pointer

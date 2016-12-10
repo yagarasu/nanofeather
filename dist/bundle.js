@@ -46,10 +46,15 @@ var Memory = require('../Memory');
 var Screen = require('../Screen');
 var Clock = require('./Clock');
 
-
+/*
+Jumps:
+- http://unixwiz.net/techtips/x86-jumps.html
+On how the flags are set:
+- http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
+*/
 
 var log = function () {
-  var debug = true;
+  var debug = false;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
@@ -62,19 +67,19 @@ var CPU = function (options) {
   
   this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
-  this.clock.on('tick', function () {
-    console.log(this.memory.regs8);
-  }.bind(this));
   this.clock.on('start', function () { log('Clock started.'); });
   this.clock.on('stop', function () { log('Clock stopped.'); });
   
   this.output = options.output;
   this.outputMemory = this.memory.getMap(0xF6E0, 800);
   this.screen = new Screen(this.output, this.outputMemory);
+  this.screen.clear();
   this.clock.on('tick', function () { this.screen.render(); }.bind(this));
   
+  this.interrupts = {};
+  
   this.PC = 0x0000;
-  this.SP = 0x1C1F;
+  this.SP = this.SBP = 0x1C1F;
   this.flags = {
     carry: false,
     parity: false,
@@ -83,6 +88,17 @@ var CPU = function (options) {
     overflow: false
   };
   this.halted = true;
+};
+
+CPU.prototype.assignInterrupt = function (iden, interrupt) {
+  this.interrupts[iden] = interrupt;
+};
+
+CPU.prototype.callInterrupt = function (iden) {
+  log('callInterrupt');
+  this.clock.stop();
+  this.interrupts[iden].call(this, this.memory, this.PC, this.SP);
+  this.clock.start();
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -218,7 +234,6 @@ CPU.prototype.step = function () {
         var res = regCont | arg2;
         log('OR', regA, regCont, '|', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
-        console.log(res);
         this.memory.writeReg(regA, res);
         break;
       
@@ -344,6 +359,11 @@ CPU.prototype.step = function () {
       case 'RET':
         var addr = this.memory.readMem(++this.SP);
         this.PC = addr;
+        break;
+        
+      case 'INT':
+        var interrupt = this.getNextByte();
+        this.callInterrupt(interrupt);
         break;
         
       default:
@@ -506,7 +526,8 @@ var opcodes = [
   'CALL_RA',
   'CALL_A',
   'CALL_C',
-  'RET'
+  'RET',
+  'INT'
 ];
 
 module.exports = {
@@ -611,6 +632,7 @@ var Screen = function (outputElement, screenMem) {
   this.mode = MODE_TEXT;
   this.memBase = 0;
   this.memPerPage = memPerPageByMode[this.mode];
+  this.charmap = CHARMAP;
 };
 
 Screen.prototype.setupElement = function () {
@@ -673,14 +695,38 @@ Screen.prototype.renderText = function () {
 module.exports = Screen;
 
 },{}],6:[function(require,module,exports){
+module.exports = function (memory, PC, SP) {
+  var cmd = memory.readReg(0x0); // Read A
+  switch (cmd) {
+    // console.log
+    case 0x0:
+      var dataPointer = memory.readReg(20); // Read X
+      var char = memory.readMem(dataPointer++); // Read [X]
+      var charS = this.screen.charmap[char];
+      var str = '';
+      var i = 0;
+      // Look for null terminator
+      while (char !== 0x0 && i < 20) {
+        str += charS;
+        char = memory.readMem(dataPointer++);
+        charS = this.screen.charmap[char];
+        i++;
+      }
+      // Apply function
+      console.log(str);
+      break;
+  }
+};
+},{}],7:[function(require,module,exports){
 var CPU = require('./CPU');
+var sysInts = require('./SysInts');
 
 var output = document.getElementById('output');
 var cpu = new CPU({
   output: output
 });
 
-window.cpu = cpu;
+cpu.assignInterrupt(0x1, sysInts)
 
 // cpu.memory.writeReg(0x0, 0x10);
 // cpu.memory.writeReg(0x1, 0x10);
@@ -707,25 +753,16 @@ var program = new Uint8Array([
      
   // Start program
   
-  42, 4, 0xE0,  // MOV XL, 0xE0 ; Set X to Screen mem
-  42, 5, 0xF6,  // MOV XH, 0xF6
-  
-  42, 0, 0x02,  // MOV A, 0x02  ; point string to A
-  
-  40, 1, 0,     // MOV B, [A]   ; Add color flags
-  76, 1, 0,     // CMP B, 0     ; Compare char with null
-  57, 0x2C,     // JE 0x2C      ; Jump out of loop if null found
-  26, 1, 0xC0,  // OR B, 0xC0   ;  to char into B from A pointer
-  43, 20, 1,    // MOV [X], B   ; Print char to screen
-  17, 20,       // INC X        ; Increment screen pointer
-  17, 0,        // INC A        ; Increment string pointer
-  54, 0x18,     // JMP 0x18     ; Jump back to the loop
+  42, 4, 0x02,  // MOV XL, 0xE0 ; Set X to string
+  42, 0, 0x0,   // MOV A, 0x02  ; Set INT 0x1 argument to 0x0 (console log);
+  81, 0x1,      // INT 0x1
   
   0,            // HLT
 
 ]);
 
+window.cpu = cpu;
 cpu.loadProgram(program);
 cpu.run();
 
-},{"./CPU":2}]},{},[6]);
+},{"./CPU":2,"./SysInts":6}]},{},[7]);
