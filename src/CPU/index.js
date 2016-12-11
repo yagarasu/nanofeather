@@ -11,7 +11,7 @@ On how the flags are set:
 */
 
 var log = function () {
-  var debug = false;
+  var debug = true;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
@@ -24,6 +24,7 @@ var CPU = function (options) {
   
   this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
+  this.clock.on('tick', function () { log('Clock'); });
   this.clock.on('start', function () { log('Clock started.'); });
   this.clock.on('stop', function () { log('Clock stopped.'); });
   
@@ -34,6 +35,7 @@ var CPU = function (options) {
   this.clock.on('tick', function () { this.screen.render(); }.bind(this));
   
   this.interrupts = {};
+  this.devices = [];
   
   this.PC = 0x0000;
   this.SP = this.SBP = 0x1C1F;
@@ -52,10 +54,22 @@ CPU.prototype.assignInterrupt = function (iden, interrupt) {
 };
 
 CPU.prototype.callInterrupt = function (iden) {
-  log('callInterrupt');
+  console.log('call interrupt', iden);
+  console.log('clock', this.clock);
   this.clock.stop();
+  this.halted = true;
   this.interrupts[iden].call(this, this.memory, this.PC, this.SP);
+};
+
+CPU.prototype.installDevice = function (device) {
+  this.devices.push(device);
+  console.log('cpu installDevice', this);
+  device.call(null, this);
+};
+
+CPU.prototype.iret = function () {
   this.clock.start();
+  this.halted = false;
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -83,6 +97,7 @@ CPU.prototype.run = function () {
 
 CPU.prototype.step = function () {
   log('==== Step', this.PC);
+  if (this.halted) return;
   try {
     var bc = this.getNextByte();
     var parsed = this.parseBytecode(bc);

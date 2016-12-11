@@ -1,0 +1,14 @@
+// Show keyboard chars
+  
+  // Screen mem in X
+  42, 4, 0xE0,  // MOV XL, 0xE0
+  42, 5, 0xF6,  // MOV XH, 0xF6
+  
+  81, 0x0,      // INT 0x0 ; Call int 0
+  39, 1, 3,     // MOV B, D
+  26, 1, 0xC0,  // OR B, 0xC0
+  
+  43, 20, 1,    // MOV [X], B   ; Print char to screen
+  54, 0x6,     // JMP 0x6     ; Jump back to the loop
+  
+  0,            // HLT

@@ -1,11 +1,14 @@
 var CPU = require('./CPU');
-var sysInts = require('./SysInts');
 
 var output = document.getElementById('output');
 var cpu = new CPU({
   output: output
 });
 
+var Keyboard = require('./Devices/Keyboard');
+cpu.installDevice(Keyboard);
+
+var sysInts = require('./SysInts');
 cpu.assignInterrupt(0x1, sysInts)
 
 // cpu.memory.writeReg(0x0, 0x10);
@@ -24,18 +27,23 @@ cpu.assignInterrupt(0x1, sysInts)
 
 var program = new Uint8Array([
   
-  // Print "Hello, World!"
-  54, 0xF, // JMP 0xF ; To the begining of execution
+  // Show keyboard chars
   
-  // Data
-  // H     E     L     L     O     ,    W     O     R     L     D     !    <null>
-     0x28, 0x25, 0x2C, 0x2C, 0x2F, 0x7, 0x37, 0x2F, 0x32, 0x2C, 0x24, 0xC, 0x0,
-     
-  // Start program
+  // Screen mem in X
+  42, 4, 0xE0,  // MOV XL, 0xE0
+  42, 5, 0xF6,  // MOV XH, 0xF6
   
-  42, 4, 0x02,  // MOV XL, 0xE0 ; Set X to string
-  42, 0, 0x0,   // MOV A, 0x02  ; Set INT 0x1 argument to 0x0 (console log);
-  81, 0x1,      // INT 0x1      ; Call INT 01
+  42, 0, 0x2,   // MOV A, 0x2 ; Set 2 for int 0
+  81, 0x0,      // INT 0x0 ; Call int 0 (kbd)
+  
+  76, 3, 0,     // CMP D, 0
+  57, 31,       // JE 31
+  40, 1, 20,    // MOV B, [X]
+  26, 1, 0xC0,  // OR B, 0xC0
+  43, 20, 1,    // MOV [X], B   ; Print char to screen
+  17, 20,       // INC X
+  18, 3,        // DEC D
+  54, 0xB,      // JMP 0xB     ; Jump back to the loop
   
   0,            // HLT
 

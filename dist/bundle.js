@@ -54,7 +54,7 @@ On how the flags are set:
 */
 
 var log = function () {
-  var debug = false;
+  var debug = true;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
@@ -67,6 +67,7 @@ var CPU = function (options) {
   
   this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
+  this.clock.on('tick', function () { log('Clock'); });
   this.clock.on('start', function () { log('Clock started.'); });
   this.clock.on('stop', function () { log('Clock stopped.'); });
   
@@ -77,6 +78,7 @@ var CPU = function (options) {
   this.clock.on('tick', function () { this.screen.render(); }.bind(this));
   
   this.interrupts = {};
+  this.devices = [];
   
   this.PC = 0x0000;
   this.SP = this.SBP = 0x1C1F;
@@ -95,10 +97,22 @@ CPU.prototype.assignInterrupt = function (iden, interrupt) {
 };
 
 CPU.prototype.callInterrupt = function (iden) {
-  log('callInterrupt');
+  console.log('call interrupt', iden);
+  console.log('clock', this.clock);
   this.clock.stop();
+  this.halted = true;
   this.interrupts[iden].call(this, this.memory, this.PC, this.SP);
+};
+
+CPU.prototype.installDevice = function (device) {
+  this.devices.push(device);
+  console.log('cpu installDevice', this);
+  device.call(null, this);
+};
+
+CPU.prototype.iret = function () {
   this.clock.start();
+  this.halted = false;
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -126,6 +140,7 @@ CPU.prototype.run = function () {
 
 CPU.prototype.step = function () {
   log('==== Step', this.PC);
+  if (this.halted) return;
   try {
     var bc = this.getNextByte();
     var parsed = this.parseBytecode(bc);
@@ -444,7 +459,7 @@ CPU.prototype.setFlagsBit = function (A, B, res) {
 };
 
 module.exports = CPU;
-},{"../Memory":4,"../Screen":5,"./Clock":1,"./opcodes":3}],3:[function(require,module,exports){
+},{"../Memory":5,"../Screen":6,"./Clock":1,"./opcodes":3}],3:[function(require,module,exports){
 var opcodes = [
   'HLT',
   'ADD_R_R',
@@ -539,6 +554,87 @@ module.exports = {
   bcs: opcodes
 };
 },{}],4:[function(require,module,exports){
+var Keyboard = function (cpu) {
+  var interrupt = false;
+  var key = null;
+  var event = null;
+  
+  var kc2charmap = function (k) {
+    if (k >= 48 && k <= 57) { // Number
+      return k - 32;
+    }
+    if (k >= 65 && k <= 90) { // Char: Wow, same interval!
+      return k - 32;
+    }
+    var map = {
+      107: 0x01,
+      109: 0x02,
+      106: 0x03,
+      111: 0x04,
+      188: 0x06,
+      107: 0x07,
+      160: 0x0A
+    };
+    return map[k];
+  };
+  
+  var evtHnd = function (e) {
+    console.log('key', e);
+    //key = kc2charmap(keycode);
+    var keycode = e.which;
+    interrupt = true;
+    key = e.which;
+    event = e.type;
+  };
+  
+  document.addEventListener('keypress', evtHnd);
+  // document.addEventListener('keyup', evtHnd);
+  
+  cpu.assignInterrupt(0, function (memory, PC, SP) {
+    console.log('interrupt in keyboard', key);
+    var cmd = memory.readReg(0x0); // Read A
+    console.log('cmd', cmd);
+    switch (cmd) {
+      // Write current keypress on reg D
+      case 0x0:
+        if (!interrupt) return cpu.iret();
+        interrupt = false;
+        memory.writeReg(0x3, key);
+        return cpu.iret();
+      // Write keystroke into X
+      case 0x1:
+        var buffer = memory.readReg(20);
+        if (!interrupt) return cpu.iret();
+        interrupt = false;
+        memory.writeMem(buffer, key);
+        return cpu.iret();
+      // Write a stream of keystrokes starting into X
+      case 0x2:
+        var buffer = memory.readReg(20);
+        var stream = [];
+        var keyStream = function (e) {
+          // Wait until enter
+          if (e.which === 13) {
+            document.removeEventListener('keypress', keyStream);
+            for (var i = 0; i < stream.length; i++) {
+              memory.writeMem(buffer + i, stream[i]);
+            }
+            // Write length into reg D
+            memory.writeReg(0x3, stream.length);
+            interrupt = false;
+            return cpu.iret();
+          }
+          stream.push(e.which);
+        };
+        document.addEventListener('keypress', keyStream);
+        break;
+    }
+  });
+  
+};
+
+module.exports = Keyboard;
+},{}],5:[function(require,module,exports){
 var Memory = function () {
   this._raw = new ArrayBuffer(64000);
   this.mem = new Uint8Array(this._raw, 0);
@@ -601,7 +697,7 @@ Memory.prototype.getMap = function (address, length) {
 
 module.exports = Memory;
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 var WIDTH = 100,
     HEIGHT = 32,
     COLOR_BLACK = '#000000',
@@ -694,7 +790,7 @@ Screen.prototype.renderText = function () {
 
 module.exports = Screen;
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 module.exports = function (memory, PC, SP) {
   var cmd = memory.readReg(0x0); // Read A
   switch (cmd) {
@@ -717,15 +813,18 @@ module.exports = function (memory, PC, SP) {
       break;
   }
 };
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var CPU = require('./CPU');
-var sysInts = require('./SysInts');
 
 var output = document.getElementById('output');
 var cpu = new CPU({
   output: output
 });
 
+var Keyboard = require('./Devices/Keyboard');
+cpu.installDevice(Keyboard);
+
+var sysInts = require('./SysInts');
 cpu.assignInterrupt(0x1, sysInts)
 
 // cpu.memory.writeReg(0x0, 0x10);
@@ -744,18 +843,23 @@ cpu.assignInterrupt(0x1, sysInts)
 
 var program = new Uint8Array([
   
-  // Print "Hello, World!"
-  54, 0xF, // JMP 0xF ; To the begining of execution
+  // Show keyboard chars
   
-  // Data
-  // H     E     L     L     O     ,    W     O     R     L     D     !    <null>
-     0x28, 0x25, 0x2C, 0x2C, 0x2F, 0x7, 0x37, 0x2F, 0x32, 0x2C, 0x24, 0xC, 0x0,
-     
-  // Start program
+  // Screen mem in X
+  42, 4, 0xE0,  // MOV XL, 0xE0
+  42, 5, 0xF6,  // MOV XH, 0xF6
   
-  42, 4, 0x02,  // MOV XL, 0xE0 ; Set X to string
-  42, 0, 0x0,   // MOV A, 0x02  ; Set INT 0x1 argument to 0x0 (console log);
-  81, 0x1,      // INT 0x1
+  42, 0, 0x2,   // MOV A, 0x2 ; Set 2 for int 0
+  81, 0x0,      // INT 0x0 ; Call int 0 (kbd)
+  
+  76, 3, 0,     // CMP D, 0
+  57, 31,       // JE 31
+  40, 1, 20,    // MOV B, [X]
+  26, 1, 0xC0,  // OR B, 0xC0
+  43, 20, 1,    // MOV [X], B   ; Print char to screen
+  17, 20,       // INC X
+  18, 3,        // DEC D
+  54, 0xB,      // JMP 0xB     ; Jump back to the loop
   
   0,            // HLT
 
@@ -765,4 +869,4 @@ window.cpu = cpu;
 cpu.loadProgram(program);
 cpu.run();
 
-},{"./CPU":2,"./SysInts":6}]},{},[7]);
+},{"./CPU":2,"./Devices/Keyboard":4,"./SysInts":7}]},{},[8]);
