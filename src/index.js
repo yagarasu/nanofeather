@@ -73,9 +73,9 @@ window.cpu = cpu;
 cpu.loadProgram(program);
 
 window.addEventListener('keydown', function (e) {
-  //console.log(e);
-  // Ctrl H to halt
-  if (e.ctrlKey && e.which === 72) {
+  //console.log(e.which);
+  // Ctrl S to halt
+  if (e.ctrlKey && e.which === 83) {
     cpu.halt();
     e.preventDefault();
     return false;
@@ -87,19 +87,21 @@ window.addEventListener('keydown', function (e) {
     e.preventDefault();
     return false;
   }
-  if (e.shiftKey && e.which === 107) {
+  if (e.shiftKey && e.which === 40) {
     cpu.clock.speed += 10;
     console.log('Set speed to', cpu.clock.speed);
     e.preventDefault();
     return false;
   }
-  if (e.shiftKey && e.which === 109) {
-    cpu.clock.speed -= 10;
-    console.log('Set speed to', cpu.clock.speed);
-    e.preventDefault();
+  if (e.shiftKey && e.which === 38) {
+    if (cpu.clock.speed > 0) {
+      cpu.clock.speed -= 10;
+      console.log('Set speed to', cpu.clock.speed);
+      e.preventDefault();
+    }
     return false;
   }
-  if (e.shiftKey && e.which === 106) {
+  if (e.shiftKey && e.which === 39) {
     cpu.clock.speed = parseInt(prompt('Set new clock speed:', '1000'), 10);
     console.log('Set speed to', cpu.clock.speed);
     e.preventDefault();

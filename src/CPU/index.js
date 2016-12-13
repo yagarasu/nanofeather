@@ -22,11 +22,13 @@ var CPU = function (options) {
   this.clock.on('start', function () { this.log('Clock started.'); }.bind(this));
   this.clock.on('stop', function () { this.log('Clock stopped.'); }.bind(this));
   
-  this.output = options.output;
-  this.outputMemory = this.memory.getMap(0xF6E0, 800);
-  this.screen = new Screen(this.output, this.outputMemory);
-  this.screen.clear();
-  this.clock.on('tick', function () { this.screen.render(); }.bind(this));
+  if (options.output) {
+    this.output = options.output;
+    this.outputMemory = this.memory.getMap(0xF6E0, 800);
+    this.screen = new Screen(this.output, this.outputMemory);
+    this.screen.clear();
+    this.clock.on('tick', function () { this.screen.render(); }.bind(this));
+  }
   
   this.interrupts = {};
   this.devices = [];

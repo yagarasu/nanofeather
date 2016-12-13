@@ -3,10 +3,138 @@
   <head>
     <meta charset="utf-8">
     <title>CPU</title>
+    <style type="text/css">
+      * {
+        margin: 0px;
+        padding: 0px;
+      }
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #main {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-flow: row;
+      }
+      #main h2 {
+        font-size: 16px;
+        font-family: monospace;
+        box-sizing: border-box;
+        padding: 0.3em;
+      }
+      #code, #screen, #console {
+        flex: auto;
+        width: 30%;
+      }
+      #code {
+        display: flex;
+        flex-flow: column;
+      }
+      #code h2 {
+        background: #0000aa;
+        color: #ffffff;
+      }
+      #code textarea {
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        padding: 0.5em;
+        background: #0000aa;
+        color: #ffffff;
+        font-family: monospace;
+        font-size: 21px;
+        border: 0px;
+        resize: none;
+      }
+      #screen {
+        display: flex;
+        flex-flow: column;
+      }
+      #screen-output {
+        background: #333;
+        text-align: center;
+      }
+      #screen-output h2 {
+        color: #999999;
+      }
+      #memMap {
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+      #console textarea {
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        padding: 0.5em;
+        background: #000000;
+        color: #ffffff;
+        font-family: monospace;
+        font-size: 16px;
+        border: 0px;
+        resize: none;
+      }
+      #console h2 {
+        background: #000000;
+        color: #999999;
+      }
+      #screen-output, #screen-mem {
+        height: 50%;
+      }
+      #screen-mem h2 {
+        background: #000000;
+        color: #999999;
+      }
+      #code-tools {
+        display: flex;
+        flex-flow: row;
+        flex-wrap: wrap;
+        background: #aaaaaa;
+      }
+      #code-tools div {
+        box-sizing: border-box;
+        width: 50%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: monospace;
+      }
+      #code-tools kbd {
+        color: #ffffff;
+        width: 25%;
+      }
+    </style>
   </head>
   <body>
     <div id="main">
-      <canvas id="output"></canvas>
+      <div id="code">
+        <h2>Code editor</h2>
+        <textarea name="code"></textarea>
+        <div id="code-tools">
+          <div><kbd>Ctrl + S</kbd> Stop</div>
+          <div><kbd>Ctrl + D</kbd> Toggle debug</div>
+          <div><kbd>Shft + DOWN</kbd> Slower clock</div>
+          <div><kbd>Shft + UP</kbd> Faster clock</div>
+          <div><kbd>Shft + RIGHT</kbd> Set clock</div>
+        </div>
+      </div>
+      <div id="screen">
+        <div id="screen-output">
+          <h2>Screen</h2>
+          <canvas id="output"></canvas>  
+        </div>
+        <div id="screen-mem">
+          <h2>Memory</h2>
+          <canvas id="memMap"></canvas>
+        </div>
+      </div>
+      <div id="console">
+        <h2>Console output</h2>
+        <textarea id="console-txt" readonly></textarea>
+      </div>
     </div>
     <script src="./bundle.js"></script>
   </body>
