@@ -70,10 +70,15 @@ var Keyboard = function (cpu, device, bufferOffset, bufferLength) {
         memory.writeMem(X, (char | C));
         return cpu.iret();
         
-      // Force buffer shift
+      // Force buffer shift to the right
       case 0x4:
         buffer.copyWithin(1, 0);
         buffer[0x0] = 0;
+        return cpu.iret();
+        
+      // Force buffer shift to the left
+      case 0x5:
+        buffer.copyWithin(0, 1);
         return cpu.iret();
 
       default:

@@ -54,7 +54,7 @@ On how the flags are set:
 */
 
 var log = function () {
-  var debug = false;
+  var debug = true;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
@@ -631,10 +631,15 @@ var Keyboard = function (cpu, device, bufferOffset, bufferLength) {
         memory.writeMem(X, (char | C));
         return cpu.iret();
         
-      // Force buffer shift
+      // Force buffer shift to the right
       case 0x4:
         buffer.copyWithin(1, 0);
         buffer[0x0] = 0;
+        return cpu.iret();
+        
+      // Force buffer shift to the left
+      case 0x5:
+        buffer.copyWithin(0, 1);
         return cpu.iret();
 
       default:
@@ -847,26 +852,52 @@ var program = new Uint8Array([
   42, 4, 0xE0,  // MOV XL, 0xE0
   42, 5, 0xF6,  // MOV XH, 0xF6
   
+  // Screen limit in Y
+  // off: 6
+  42, 6, 0xF7,  // MOV YL, 0xF7
+  42, 7, 0x30,  // MOV YH, 0x30
+  
   // Add prompt
+  // off: 12
   45, 20, 0xC5, // MOV [X], 0xC5
   
   // Check keystrokes
+  // off: 15
   42, 0, 0,     // MOV A, 0x0
   81, 0,        // INT 0x0; A=0
   76, 3, 0,     // CMP D, 0 ; No new keys
-  57, 9,        // JE 9; Jump to loop
+  57, 15,        // JE 15; Jump to loop
   
+  // off: 25
   42, 0, 3,     // MOV A, 0x3 ; Copy keyboard buffer[B] to X, ORed with C
   42, 1, 0,     // MOV B, 0
   42, 2, 0xC0,  // MOV C, 0xC0; OR with white
   81, 0,        // INT 0x0; A=3
   
+  // off: 36
   42, 0, 4,     // MOV A, 0x4; Force shift
   81, 0,        // INT 0x0; A=4
   42, 3, 0,     // MOV D, 0x0
   17, 20,       // INC X
+  
+  // off: 46
+  73, 20, 22,   // CMP X, Y
+  57, 53,       // JE 53
+  54, 72,       // JMP 72
+  
+  // off: 53
+  47, 2,          // PUSH C
+  42, 2, 80,      // MOV C, 80; Counter to 80
+  42, 0, 4,       // MOV A, 0x5; Force shift left
+  81, 0,          // INT 0x0; A=4
+  18, 2,          // DEC C
+  73, 2, 0,       // CMP C, 0
+  60, 59,         // JNE 59
+  51, 2,          // POP C
+  
+  // off: 72
   45, 20, 0xC5, // MOV [X], 0xC5
-  54, 9         // JMP 9; Return to main loop
+  54, 15         // JMP 15; Return to main loop
 
 ]);
 

@@ -11,7 +11,7 @@ On how the flags are set:
 */
 
 var log = function () {
-  var debug = false;
+  var debug = true;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
