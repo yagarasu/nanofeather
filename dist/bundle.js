@@ -53,23 +53,17 @@ On how the flags are set:
 - http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
 */
 
-var log = function () {
-  var debug = true;
-  if (debug) {
-    var args = Array.prototype.slice.call(arguments);
-    console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
-  }
-};
-
 var CPU = function (options) {
+  this.debug = true;
+  
   this.memory = new Memory();
   window.memory = this.memory;
   
   this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
-  this.clock.on('tick', function () { log('Clock'); });
-  this.clock.on('start', function () { log('Clock started.'); });
-  this.clock.on('stop', function () { log('Clock stopped.'); });
+  this.clock.on('tick', function () { this.log('Clock'); }.bind(this));
+  this.clock.on('start', function () { this.log('Clock started.'); }.bind(this));
+  this.clock.on('stop', function () { this.log('Clock stopped.'); }.bind(this));
   
   this.output = options.output;
   this.outputMemory = this.memory.getMap(0xF6E0, 800);
@@ -90,6 +84,17 @@ var CPU = function (options) {
     overflow: false
   };
   this.halted = true;
+};
+
+CPU.prototype.toggleDebug = function () {
+  this.debug = !this.debug;
+};
+
+CPU.prototype.log = function () {
+  if (this.debug) {
+    var args = Array.prototype.slice.call(arguments);
+    console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
+  }
 };
 
 CPU.prototype.assignInterrupt = function (iden, interrupt) {
@@ -122,7 +127,7 @@ CPU.prototype.loadProgram = function (prog, offset) {
 };
 
 CPU.prototype.getNextByte = function () {
-  log('getNextByte');
+  this.log('getNextByte');
   return this.memory.readMem(this.PC++);
 };
 
@@ -137,12 +142,12 @@ CPU.prototype.run = function () {
 };
 
 CPU.prototype.step = function () {
-  log('==== Step', this.PC);
+  this.log('==== Step', this.PC);
   if (this.halted) return;
   try {
     var bc = this.getNextByte();
     var parsed = this.parseBytecode(bc);
-    log(parsed);
+    this.log(parsed);
     switch (parsed.cmd) {
       case 'HLT':
         this.halt();
@@ -157,7 +162,7 @@ CPU.prototype.step = function () {
         } else {
           res = this.setFlagsMath16(regCont, 1, res);  
         }
-        log('INC', reg, '=', res);
+        this.log('INC', reg, '=', res);
         this.memory.writeReg(reg, res);
         break;
         
@@ -170,7 +175,7 @@ CPU.prototype.step = function () {
         } else {
           res = this.setFlagsMath16(regCont, 1, res);  
         }
-        log('DEC', reg, '=', res);
+        this.log('DEC', reg, '=', res);
         this.memory.writeReg(reg, res);
         break;
         
@@ -180,7 +185,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont + arg2;
-        log('ADD', regA, regCont, '+', arg2, '=', res);
+        this.log('ADD', regA, regCont, '+', arg2, '=', res);
         res = this.setFlagsMath(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -191,7 +196,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont - arg2;
-        log('SUB', regA, regCont, '-', arg2, '=', res);
+        this.log('SUB', regA, regCont, '-', arg2, '=', res);
         res = this.setFlagsMath(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -202,7 +207,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont * arg2;
-        log('MUL', regA, regCont, '*', arg2, '=', res);
+        this.log('MUL', regA, regCont, '*', arg2, '=', res);
         res = this.setFlagsMath(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -213,7 +218,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = Math.round(regCont / arg2);
-        log('DIV', regA, regCont, '/', arg2, '=', res);
+        this.log('DIV', regA, regCont, '/', arg2, '=', res);
         res = this.setFlagsMath(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -224,7 +229,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont - arg2;
-        log('CMP', regA, regCont, '?', arg2, '=', res);
+        this.log('CMP', regA, regCont, '?', arg2, '=', res);
         res = this.setFlagsMath(regCont, arg2, res);
         break;
         
@@ -234,7 +239,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont & arg2;
-        log('AND', regA, regCont, '&', arg2, '=', res);
+        this.log('AND', regA, regCont, '&', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -245,7 +250,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont | arg2;
-        log('OR', regA, regCont, '|', arg2, '=', res);
+        this.log('OR', regA, regCont, '|', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -256,7 +261,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = regCont ^ arg2;
-        log('XOR', regA, regCont, '^', arg2, '=', res);
+        this.log('XOR', regA, regCont, '^', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -267,7 +272,7 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = (regCont << arg2) & 0xFF;
-        log('SHL', regA, regCont, '<<', arg2, '=', res);
+        this.log('SHL', regA, regCont, '<<', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
@@ -278,21 +283,21 @@ CPU.prototype.step = function () {
         var regCont = this.memory.readReg(regA);
         var arg2 = this.getNextArgValue(parsed.arg2type);
         var res = (regCont >> arg2) && 0xFF;
-        log('SHR', regA, regCont, '>>', arg2, '=', res);
+        this.log('SHR', regA, regCont, '>>', arg2, '=', res);
         res = this.setFlagsBit(regCont, arg2, res);
         this.memory.writeReg(regA, res);
         break;
         
       case 'PUSH':
         var arg = this.getNextArgValue(parsed.arg1type);
-        log('PUSH', this.SP, '<-', arg);
+        this.log('PUSH', this.SP, '<-', arg);
         this.memory.writeMem(this.SP--, arg);
         break;
         
       case 'POP':
         var reg = this.getNextByte();
         var val = this.memory.readMem(++this.SP);
-        log('POP', this.SP-1, '->', reg);
+        this.log('POP', this.SP-1, '->', reg);
         this.memory.writeReg(reg, val);
         break;
         
@@ -300,18 +305,18 @@ CPU.prototype.step = function () {
         if (parsed.arg1type === 'R') {
           var reg = this.getNextByte();
           var val = this.getNextArgValue(parsed.arg2type);
-          log('MOV', 'reg', reg, '<-', val);
+          this.log('MOV', 'reg', reg, '<-', val);
           this.memory.writeReg(reg, val);
         } else if (parsed.arg1type === 'RA') {
           var reg = this.getNextByte();
           var addr = this.memory.readReg(reg);
           var val = this.getNextArgValue(parsed.arg2type);
-          log('MOV', '[reg]=', addr, '<-', val);
+          this.log('MOV', '[reg]=', addr, '<-', val);
           this.memory.writeMem(addr, val);
         } else if (parsed.arg1type === 'A') {
           var addr = this.getNextArgValue('A');
           var val = this.getNextArgValue(parsed.arg2type);
-          log('MOV', 'addr', addr, '<-', val);
+          this.log('MOV', 'addr', addr, '<-', val);
           this.memory.writeMem(addr, val);
         }
         break;
@@ -381,12 +386,12 @@ CPU.prototype.step = function () {
         
       case 'BRK':
         this.halt();
-        log('Break at', this.PC.toString(16));
-        log('Registers', this.memory.regs8, this.memory.regs16);
+        this.log('Break at', this.PC.toString(16));
+        this.log('Registers', this.memory.regs8, this.memory.regs16);
         break;
         
       default:
-        log('Not implemented yet:' + parsed.cmd);
+        this.log('Not implemented yet:' + parsed.cmd);
     }
   } catch (e) {
     this.halt();
@@ -435,7 +440,7 @@ CPU.prototype.setFlagsMath = function (A, B, res) {
   } else {
     this.flags.carry = false;
   }
-  log('FLAGS:', this.flags);
+  this.log('FLAGS:', this.flags);
   return res;
 };
 
@@ -450,7 +455,7 @@ CPU.prototype.setFlagsMath16 = function (A, B, res) {
   } else {
     this.flags.carry = false;
   }
-  log('FLAGS:', this.flags);
+  this.log('FLAGS:', this.flags);
   return res;
 };
 
@@ -458,7 +463,7 @@ CPU.prototype.setFlagsBit = function (A, B, res) {
   this.flags.zero = (res === 0);
   this.flags.sign = (res >> 7) > 0;
   this.flags.parity = (res & 0x1);
-  log('FLAGS:', this.flags);
+  this.log('FLAGS:', this.flags);
   return res;
 };
 
@@ -888,8 +893,8 @@ var program = new Uint8Array([
   // off: 53
   47, 2,          // PUSH C
   42, 2, 80,      // MOV C, 80; Counter to 80
-  42, 0, 4,       // MOV A, 0x5; Force shift left
-  81, 0,          // INT 0x0; A=4
+  42, 0, 5,       // MOV A, 0x5; Force shift left
+  81, 0,          // INT 0x0; A=5
   18, 2,          // DEC C
   73, 2, 0,       // CMP C, 0
   60, 59,         // JNE 59
@@ -906,8 +911,16 @@ cpu.loadProgram(program);
 
 window.addEventListener('keydown', function (e) {
   //console.log(e);
-  if (e.ctrlKey && e.which === 67) {
+  // Ctrl H to halt
+  if (e.ctrlKey && e.which === 72) {
     cpu.halt();
+    e.preventDefault();
+    return false;
+  }
+  // Ctrl D to debug
+  if (e.ctrlKey && e.which === 68) {
+    cpu.toggleDebug();
+    console.log('Set debug to:', cpu.debug);
     e.preventDefault();
     return false;
   }

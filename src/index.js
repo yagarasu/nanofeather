@@ -56,8 +56,8 @@ var program = new Uint8Array([
   // off: 53
   47, 2,          // PUSH C
   42, 2, 80,      // MOV C, 80; Counter to 80
-  42, 0, 4,       // MOV A, 0x5; Force shift left
-  81, 0,          // INT 0x0; A=4
+  42, 0, 5,       // MOV A, 0x5; Force shift left
+  81, 0,          // INT 0x0; A=5
   18, 2,          // DEC C
   73, 2, 0,       // CMP C, 0
   60, 59,         // JNE 59
@@ -74,8 +74,16 @@ cpu.loadProgram(program);
 
 window.addEventListener('keydown', function (e) {
   //console.log(e);
-  if (e.ctrlKey && e.which === 67) {
+  // Ctrl H to halt
+  if (e.ctrlKey && e.which === 72) {
     cpu.halt();
+    e.preventDefault();
+    return false;
+  }
+  // Ctrl D to debug
+  if (e.ctrlKey && e.which === 68) {
+    cpu.toggleDebug();
+    console.log('Set debug to:', cpu.debug);
     e.preventDefault();
     return false;
   }
