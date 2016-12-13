@@ -80,7 +80,8 @@ var opcodes = [
   'CALL_A',
   'CALL_C',
   'RET',
-  'INT'
+  'INT',
+  'BRK'
 ];
 
 module.exports = {

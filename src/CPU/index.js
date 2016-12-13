@@ -11,7 +11,7 @@ On how the flags are set:
 */
 
 var log = function () {
-  var debug = true;
+  var debug = false;
   if (debug) {
     var args = Array.prototype.slice.call(arguments);
     console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
@@ -38,7 +38,7 @@ var CPU = function (options) {
   this.devices = [];
   
   this.PC = 0x0000;
-  this.SP = this.SBP = 0x1C1F;
+  this.SP = this.SBP = 0xF5DF;
   this.flags = {
     carry: false,
     parity: false,
@@ -54,8 +54,6 @@ CPU.prototype.assignInterrupt = function (iden, interrupt) {
 };
 
 CPU.prototype.callInterrupt = function (iden) {
-  console.log('call interrupt', iden);
-  console.log('clock', this.clock);
   this.clock.stop();
   this.halted = true;
   this.interrupts[iden].call(this, this.memory, this.PC, this.SP);
@@ -63,8 +61,8 @@ CPU.prototype.callInterrupt = function (iden) {
 
 CPU.prototype.installDevice = function (device) {
   this.devices.push(device);
-  console.log('cpu installDevice', this);
-  device.call(null, this);
+  var args = [this].concat(Array.prototype.slice.call(arguments));
+  device.apply(this, args);
 };
 
 CPU.prototype.iret = function () {
@@ -336,6 +334,12 @@ CPU.prototype.step = function () {
       case 'INT':
         var interrupt = this.getNextByte();
         this.callInterrupt(interrupt);
+        break;
+        
+      case 'BRK':
+        this.halt();
+        log('Break at', this.PC.toString(16));
+        log('Registers', this.memory.regs8, this.memory.regs16);
         break;
         
       default:

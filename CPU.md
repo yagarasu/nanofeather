@@ -31,5 +31,5 @@ Register identifiers (opcodes):
 0000 0110 YL   Y 0001 0110
 0000 0111 YH
 
-Program counter (PC) is 16 bits
-Stack counter (SC) is 16 bits
+Program counter (PC) is 16 bits started at 0x0000
+Stack counter (SC) is 16 bits started at 0xF5DF

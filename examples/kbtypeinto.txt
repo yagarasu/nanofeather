@@ -1,0 +1,26 @@
+  // Type in screen
+  
+  // Screen mem in X / Cursor pos
+  42, 4, 0xE0,  // MOV XL, 0xE0
+  42, 5, 0xF6,  // MOV XH, 0xF6
+  
+  // Add prompt
+  45, 20, 0xC5, // MOV [X], 0xC5
+  
+  // Check keystrokes
+  42, 0, 0,     // MOV A, 0x0
+  81, 0,        // INT 0x0; A=0
+  76, 3, 0,     // CMP D, 0 ; No new keys
+  57, 9,        // JE 9; Jump to loop
+  
+  42, 0, 3,     // MOV A, 0x3 ; Copy keyboard buffer[B] to X, ORed with C
+  42, 1, 0,     // MOV B, 0
+  42, 2, 0xC0,  // MOV C, 0xC0; OR with white
+  81, 0,        // INT 0x0; A=3
+  
+  42, 0, 4,     // MOV A, 0x4; Force shift
+  81, 0,        // INT 0x0; A=4
+  42, 3, 0,     // MOV D, 0x0
+  17, 20,       // INC X
+  45, 20, 0xC5, // MOV [X], 0xC5
+  54, 9         // JMP 9; Return to main loop

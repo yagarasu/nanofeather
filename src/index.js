@@ -6,49 +6,71 @@ var cpu = new CPU({
 });
 
 var Keyboard = require('./Devices/Keyboard');
-cpu.installDevice(Keyboard);
+// Install keyboard with buffer on 0xF5E1 and 256 bytes of buffer
+cpu.installDevice(Keyboard, 0xF5E0, 256);
 
 var sysInts = require('./SysInts');
 cpu.assignInterrupt(0x1, sysInts)
 
-// cpu.memory.writeReg(0x0, 0x10);
-// cpu.memory.writeReg(0x1, 0x10);
-
-// function randomIntFromInterval(min,max) { return Math.floor(Math.random()*(max-min+1)+min); }
-
-// for (var i = 0xF6E0; i < 0xFA00; i++) {
-//   var st = randomIntFromInterval(0x1,0x3),
-//       ch = randomIntFromInterval(0x1,0x39),
-//       char = (st << 6) + ch;
-//   cpu.memory.writeMem(i, char);
-// }
-//console.log('====== RENDER =====');
-//cpu.screen.render();
-
 var program = new Uint8Array([
   
-  // Show keyboard chars
+  // Type in screen
   
-  // Screen mem in X
+  // Screen mem in X / Cursor pos
   42, 4, 0xE0,  // MOV XL, 0xE0
   42, 5, 0xF6,  // MOV XH, 0xF6
   
-  42, 0, 0x2,   // MOV A, 0x2 ; Set 2 for int 0
-  81, 0x0,      // INT 0x0 ; Call int 0 (kbd)
+  // Add prompt
+  45, 20, 0xC5, // MOV [X], 0xC5
   
-  76, 3, 0,     // CMP D, 0
-  57, 31,       // JE 31
-  40, 1, 20,    // MOV B, [X]
-  26, 1, 0xC0,  // OR B, 0xC0
-  43, 20, 1,    // MOV [X], B   ; Print char to screen
+  // Check keystrokes
+  42, 0, 0,     // MOV A, 0x0
+  81, 0,        // INT 0x0; A=0
+  76, 3, 0,     // CMP D, 0 ; No new keys
+  57, 9,        // JE 9; Jump to loop
+  
+  42, 0, 3,     // MOV A, 0x3 ; Copy keyboard buffer[B] to X, ORed with C
+  42, 1, 0,     // MOV B, 0
+  42, 2, 0xC0,  // MOV C, 0xC0; OR with white
+  81, 0,        // INT 0x0; A=3
+  
+  42, 0, 4,     // MOV A, 0x4; Force shift
+  81, 0,        // INT 0x0; A=4
+  42, 3, 0,     // MOV D, 0x0
   17, 20,       // INC X
-  18, 3,        // DEC D
-  54, 0xB,      // JMP 0xB     ; Jump back to the loop
-  
-  0,            // HLT
+  45, 20, 0xC5, // MOV [X], 0xC5
+  54, 9         // JMP 9; Return to main loop
 
 ]);
 
 window.cpu = cpu;
 cpu.loadProgram(program);
+
+window.addEventListener('keydown', function (e) {
+  //console.log(e);
+  if (e.ctrlKey && e.which === 67) {
+    cpu.halt();
+    e.preventDefault();
+    return false;
+  }
+  if (e.shiftKey && e.which === 107) {
+    cpu.clock.speed += 10;
+    console.log('Set speed to', cpu.clock.speed);
+    e.preventDefault();
+    return false;
+  }
+  if (e.shiftKey && e.which === 109) {
+    cpu.clock.speed -= 10;
+    console.log('Set speed to', cpu.clock.speed);
+    e.preventDefault();
+    return false;
+  }
+  if (e.shiftKey && e.which === 106) {
+    cpu.clock.speed = parseInt(prompt('Set new clock speed:', '1000'), 10);
+    console.log('Set speed to', cpu.clock.speed);
+    e.preventDefault();
+    return false;
+  }
+});
+
 cpu.run();
