@@ -1,3 +1,8 @@
+// polyfill lpad
+String.prototype.lpad = function (length) {
+  return ("0000" + this.toString()).slice(length * -1);
+};
+
 var CPU = require('./CPU');
 
 var output = document.getElementById('output');
@@ -11,6 +16,36 @@ cpu.installDevice(Keyboard, 0xF5E0, 256);
 
 var sysInts = require('./SysInts');
 cpu.assignInterrupt(0x1, sysInts)
+
+// Bind labels to clock
+cpu.clock.on('tick', function () {
+  document.getElementById('meta-PC').innerHTML = cpu.PC.toString(16).lpad(4);
+  document.getElementById('meta-SP').innerHTML = cpu.SP.toString(16).lpad(4);
+  document.getElementById('meta-A').innerHTML = cpu.memory.readReg(0).toString(16).lpad(2);
+  document.getElementById('meta-B').innerHTML = cpu.memory.readReg(1).toString(16).lpad(2);
+  document.getElementById('meta-C').innerHTML = cpu.memory.readReg(2).toString(16).lpad(2);
+  document.getElementById('meta-D').innerHTML = cpu.memory.readReg(3).toString(16).lpad(2);
+  document.getElementById('meta-XL').innerHTML = cpu.memory.readReg(4).toString(16).lpad(2);
+  document.getElementById('meta-XH').innerHTML = cpu.memory.readReg(5).toString(16).lpad(2);
+  document.getElementById('meta-YL').innerHTML = cpu.memory.readReg(6).toString(16).lpad(2);
+  document.getElementById('meta-YH').innerHTML = cpu.memory.readReg(7).toString(16).lpad(2);
+  document.getElementById('meta-X').innerHTML = cpu.memory.readReg(20).toString(16).lpad(4);
+  document.getElementById('meta-Y').innerHTML = cpu.memory.readReg(22).toString(16).lpad(4);
+  
+  document.getElementById('flag-C').innerHTML = (cpu.flags.carry) ? '1' : '0';
+  document.getElementById('flag-P').innerHTML = (cpu.flags.parity) ? '1' : '0';
+  document.getElementById('flag-Z').innerHTML = (cpu.flags.zero) ? '1' : '0';
+  document.getElementById('flag-S').innerHTML = (cpu.flags.sign) ? '1' : '0';
+  document.getElementById('flag-O').innerHTML = (cpu.flags.overflow) ? '1' : '0';
+});
+
+// Replace log
+cpu.log = function () {
+  if (this.debug) {
+    var args = Array.prototype.slice.call(arguments);
+    doLog(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
+  }
+};
 
 var program = new Uint8Array([
   
@@ -83,27 +118,27 @@ window.addEventListener('keydown', function (e) {
   // Ctrl D to debug
   if (e.ctrlKey && e.which === 68) {
     cpu.toggleDebug();
-    console.log('Set debug to:', cpu.debug);
+    doLog('Set debug to:', cpu.debug);
     e.preventDefault();
     return false;
   }
   if (e.shiftKey && e.which === 40) {
     cpu.clock.speed += 10;
-    console.log('Set speed to', cpu.clock.speed);
+    doLog('Set speed to', cpu.clock.speed);
     e.preventDefault();
     return false;
   }
   if (e.shiftKey && e.which === 38) {
     if (cpu.clock.speed > 0) {
       cpu.clock.speed -= 10;
-      console.log('Set speed to', cpu.clock.speed);
+      doLog('Set speed to', cpu.clock.speed);
       e.preventDefault();
     }
     return false;
   }
   if (e.shiftKey && e.which === 39) {
     cpu.clock.speed = parseInt(prompt('Set new clock speed:', '1000'), 10);
-    console.log('Set speed to', cpu.clock.speed);
+    doLog('Set speed to', cpu.clock.speed);
     e.preventDefault();
     return false;
   }

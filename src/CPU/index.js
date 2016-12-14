@@ -18,7 +18,7 @@ var CPU = function (options) {
   
   this.clock = new Clock(10);
   this.clock.on('tick', this.step.bind(this));
-  this.clock.on('tick', function () { this.log('Clock'); }.bind(this));
+  this.clock.on('tick', function () { this.log('Tick'); }.bind(this));
   this.clock.on('start', function () { this.log('Clock started.'); }.bind(this));
   this.clock.on('stop', function () { this.log('Clock stopped.'); }.bind(this));
   
@@ -86,7 +86,7 @@ CPU.prototype.loadProgram = function (prog, offset) {
 };
 
 CPU.prototype.getNextByte = function () {
-  this.log('getNextByte');
+  this.log('> getNextByte');
   return this.memory.readMem(this.PC++);
 };
 
@@ -101,7 +101,7 @@ CPU.prototype.run = function () {
 };
 
 CPU.prototype.step = function () {
-  this.log('==== Step', this.PC);
+  this.log('===== ADDR:', '0x'+this.PC.toString(16).lpad(4), '=====');
   if (this.halted) return;
   try {
     var bc = this.getNextByte();

@@ -65,7 +65,7 @@
         height: 100%;
         background: #000;
       }
-      #console textarea {
+      #console-txt {
         box-sizing: border-box;
         width: 100%;
         height: 100%;
@@ -106,6 +106,30 @@
         color: #ffffff;
         width: 25%;
       }
+      #metadata {
+        display: flex;
+        flex-flow: row;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      #metadata div {
+        flex: 0 0 auto;
+        width: calc(100%/12);
+      }
+      #metadata div span {
+        display: block;
+      }
+      
+      #flags {
+        display: flex;
+        flex-flow: row;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      #flags div {
+        flex: 0 0 auto;
+        width: calc(100%/5);
+      }
     </style>
   </head>
   <body>
@@ -124,7 +148,28 @@
       <div id="screen">
         <div id="screen-output">
           <h2>Screen</h2>
-          <canvas id="output"></canvas>  
+          <canvas id="output"></canvas>
+          <div id="metadata">
+            <div>PC: <span id="meta-PC">0</span></div>
+            <div>SP: <span id="meta-SP">0</span></div>
+            <div>A: <span id="meta-A">0</span></div>
+            <div>B: <span id="meta-B">0</span></div>
+            <div>C: <span id="meta-C">0</span></div>
+            <div>D: <span id="meta-D">0</span></div>
+            <div>XL: <span id="meta-XL">0</span></div>
+            <div>XH: <span id="meta-XH">0</span></div>
+            <div>YL: <span id="meta-YL">0</span></div>
+            <div>YH: <span id="meta-YH">0</span></div>
+            <div>X: <span id="meta-X">0</span></div>
+            <div>Y: <span id="meta-Y">0</span></div>
+          </div>
+          <div id="flags">
+            <div>C: <span id="flag-C">0</span></div>
+            <div>P: <span id="flag-P">0</span></div>
+            <div>Z: <span id="flag-Z">0</span></div>
+            <div>S: <span id="flag-S">0</span></div>
+            <div>O: <span id="flag-O">0</span></div>
+          </div>
         </div>
         <div id="screen-mem">
           <h2>Memory</h2>
@@ -133,9 +178,26 @@
       </div>
       <div id="console">
         <h2>Console output</h2>
-        <textarea id="console-txt" readonly></textarea>
+        <div id="console-txt"></div>
       </div>
     </div>
+    <script type="text/javascript">
+      var _logLines = [],
+          _logLimit = Math.floor(window.innerHeight / 21);
+      function doLog () {
+        var args = Array.prototype.slice.call(arguments);
+        var msg = args.join('&#09;')
+        var c = document.getElementById('console-txt');
+        var newLine = document.createElement('p');
+        newLine.innerHTML = msg;
+        c.appendChild(newLine);
+        _logLines.push(newLine);
+        if (_logLines.length > _logLimit) {
+          var oldLine = _logLines.shift();
+          c.removeChild(oldLine);
+        }
+      }
+    </script>
     <script src="./bundle.js"></script>
   </body>
 </html>
