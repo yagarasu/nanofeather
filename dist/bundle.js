@@ -76,8 +76,8 @@ var CPU = function (options) {
   this.interrupts = {};
   this.devices = [];
   
-  this.PC = 0x0000;
-  this.SP = this.SBP = 0xF5DF;
+  this.PC = (options.startAt !== undefined && options.startAt < 0xFFFF) ? options.startAt : 0x0000;
+  this.SP = this.SBP = (options.stackAddr !== undefined && options.stackAddr < 0xFFFF) ? options.stackAddr : 0xF5DF;
   this.flags = {
     carry: false,
     parity: false,
@@ -470,7 +470,7 @@ CPU.prototype.setFlagsBit = function (A, B, res) {
 };
 
 module.exports = CPU;
-},{"../Memory":5,"../Screen":6,"./Clock":1,"./opcodes":3}],3:[function(require,module,exports){
+},{"../Memory":6,"../Screen":7,"./Clock":1,"./opcodes":3}],3:[function(require,module,exports){
 var opcodes = [
   'HLT',
   'ADD_R_R',
@@ -658,6 +658,35 @@ var Keyboard = function (cpu, device, bufferOffset, bufferLength) {
 
 module.exports = Keyboard;
 },{}],5:[function(require,module,exports){
+var MemViewer = function (canvas, buffer, offset) {
+  this.canvas = canvas;
+  this.ctx = canvas.getContext('2d');
+  this.buffer = buffer;
+  this.offset = offset;
+  this.pxSize = 4;
+  this.viewportLength = 1024;
+  console.log(this.viewportLength);
+};
+
+MemViewer.prototype.getPx = function (val) {
+  return val * this.pxSize;
+};
+
+MemViewer.prototype.render = function () {
+  var len = (this.offset + this.viewportLength > this.buffer.byteLength) ? undefined : this.viewportLength;
+  console.log(this.buffer, this.offset, len);
+  var data = new Uint8Array(this.buffer, this.offset, len);
+  var vpw = Math.floor(this.canvas.width / 4);
+  for (var o = 0; o < this.viewportLength; o++) {
+    var x = o % vpw, y = Math.floor(o / vpw);
+    var d = data[o], c = d.toString(16), ccc = c+c+c;
+    this.ctx.fillStyle = '#' + ccc;
+    this.ctx.fillRect(this.getPx(x), this.getPx(y), this.getPx(1), this.getPx(1));
+  }
+};
+
+module.exports = MemViewer;
+},{}],6:[function(require,module,exports){
 var Memory = function () {
   this._raw = new ArrayBuffer(64000);
   this.mem = new Uint8Array(this._raw, 0);
@@ -720,7 +749,7 @@ Memory.prototype.getMap = function (address, length) {
 
 module.exports = Memory;
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 var WIDTH = 100,
     HEIGHT = 32,
     COLOR_BLACK = '#000000',
@@ -813,7 +842,7 @@ Screen.prototype.renderText = function () {
 
 module.exports = Screen;
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 module.exports = function (memory, PC, SP) {
   var cmd = memory.readReg(0x0); // Read A
   switch (cmd) {
@@ -836,7 +865,7 @@ module.exports = function (memory, PC, SP) {
       break;
   }
 };
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 // polyfill lpad
 String.prototype.lpad = function (length) {
   return ("0000" + this.toString()).slice(length * -1);
@@ -885,6 +914,14 @@ cpu.log = function () {
     doLog(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
   }
 };
+
+var MemViewer = require('./MemViewer');
+var mv = new MemViewer(document.getElementById('memMap'), cpu.memory._raw, 0);
+cpu.clock.on('tick', function () {
+  mv.render();
+  document.getElementById('memMap-from').innerHTML = mv.offset.toString(16).lpad(4);
+  document.getElementById('memMap-to').innerHTML = (mv.offset + mv.viewportLength).toString(16).lpad(4);
+});
 
 var program = new Uint8Array([
   
@@ -948,9 +985,13 @@ cpu.loadProgram(program);
 
 window.addEventListener('keydown', function (e) {
   //console.log(e.which);
-  // Ctrl S to halt
-  if (e.ctrlKey && e.which === 83) {
-    cpu.halt();
+  // Ctrl P to Pause/resume
+  if (e.ctrlKey && e.which === 80) {
+    if (cpu.clock.timer !== null) {
+      cpu.halt();
+    } else {
+      cpu.run();
+    }
     e.preventDefault();
     return false;
   }
@@ -981,8 +1022,41 @@ window.addEventListener('keydown', function (e) {
     e.preventDefault();
     return false;
   }
+  if (e.altKey && e.which === 40) {
+    try {
+      var off = mv.offset, newOffset = off + mv.viewportLength;
+      mv.offset = newOffset;
+      doLog('Set memviewer to', mv.offset.toString(16).lpad(4));
+    } catch (e) {
+      doLog('Memory limit reached in memviewer');
+    }
+    e.preventDefault();
+    return false;
+  }
+  if (e.altKey && e.which === 38) {
+    try {
+      var off = mv.offset, newOffset = off - mv.viewportLength;
+      mv.offset = newOffset;
+      doLog('Set memviewer to', mv.offset.toString(16).lpad(4));
+    } catch (e) {
+      doLog('Memory limit reached in memviewer');
+    }
+    e.preventDefault();
+    return false;
+  }
+  if (e.altKey && e.which === 39) {
+    var newOffset = parseInt(prompt('Set new memview offset (hex): 0x', 'F5E0'), 16);
+    if (isNaN(newOffset)) {
+      doLog('Error! Offset', newOffset, 'is not a number');
+      return;
+    }
+    mv.offset = newOffset;
+    doLog('Set offset to', mv.offset);
+    e.preventDefault();
+    return false;
+  }
 });
 
 cpu.run();
 
-},{"./CPU":2,"./Devices/Keyboard":4,"./SysInts":7}]},{},[8]);
+},{"./CPU":2,"./Devices/Keyboard":4,"./MemViewer":5,"./SysInts":8}]},{},[9]);

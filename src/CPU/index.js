@@ -33,8 +33,8 @@ var CPU = function (options) {
   this.interrupts = {};
   this.devices = [];
   
-  this.PC = 0x0000;
-  this.SP = this.SBP = 0xF5DF;
+  this.PC = (options.startAt !== undefined && options.startAt < 0xFFFF) ? options.startAt : 0x0000;
+  this.SP = this.SBP = (options.stackAddr !== undefined && options.stackAddr < 0xFFFF) ? options.stackAddr : 0xF5DF;
   this.flags = {
     carry: false,
     parity: false,

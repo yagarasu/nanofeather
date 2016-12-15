@@ -47,6 +47,14 @@ cpu.log = function () {
   }
 };
 
+var MemViewer = require('./MemViewer');
+var mv = new MemViewer(document.getElementById('memMap'), cpu.memory._raw, 0);
+cpu.clock.on('tick', function () {
+  mv.render();
+  document.getElementById('memMap-from').innerHTML = mv.offset.toString(16).lpad(4);
+  document.getElementById('memMap-to').innerHTML = (mv.offset + mv.viewportLength).toString(16).lpad(4);
+});
+
 var program = new Uint8Array([
   
   // Type in screen
@@ -109,9 +117,13 @@ cpu.loadProgram(program);
 
 window.addEventListener('keydown', function (e) {
   //console.log(e.which);
-  // Ctrl S to halt
-  if (e.ctrlKey && e.which === 83) {
-    cpu.halt();
+  // Ctrl P to Pause/resume
+  if (e.ctrlKey && e.which === 80) {
+    if (cpu.clock.timer !== null) {
+      cpu.halt();
+    } else {
+      cpu.run();
+    }
     e.preventDefault();
     return false;
   }
@@ -139,6 +151,39 @@ window.addEventListener('keydown', function (e) {
   if (e.shiftKey && e.which === 39) {
     cpu.clock.speed = parseInt(prompt('Set new clock speed:', '1000'), 10);
     doLog('Set speed to', cpu.clock.speed);
+    e.preventDefault();
+    return false;
+  }
+  if (e.altKey && e.which === 40) {
+    try {
+      var off = mv.offset, newOffset = off + mv.viewportLength;
+      mv.offset = newOffset;
+      doLog('Set memviewer to', mv.offset.toString(16).lpad(4));
+    } catch (e) {
+      doLog('Memory limit reached in memviewer');
+    }
+    e.preventDefault();
+    return false;
+  }
+  if (e.altKey && e.which === 38) {
+    try {
+      var off = mv.offset, newOffset = off - mv.viewportLength;
+      mv.offset = newOffset;
+      doLog('Set memviewer to', mv.offset.toString(16).lpad(4));
+    } catch (e) {
+      doLog('Memory limit reached in memviewer');
+    }
+    e.preventDefault();
+    return false;
+  }
+  if (e.altKey && e.which === 39) {
+    var newOffset = parseInt(prompt('Set new memview offset (hex): 0x', 'F5E0'), 16);
+    if (isNaN(newOffset)) {
+      doLog('Error! Offset', newOffset, 'is not a number');
+      return;
+    }
+    mv.offset = newOffset;
+    doLog('Set offset to', mv.offset);
     e.preventDefault();
     return false;
   }
