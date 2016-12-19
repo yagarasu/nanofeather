@@ -81,7 +81,30 @@ var opcodes = [
   'CALL_C',
   'RET',
   'INT',
-  'BRK'
+  'BRK',
+  // Added constant address
+  'ADD_R_CA',
+  'SUB_R_CA',
+  'MUL_R_CA',
+  'DIV_R_CA',
+  'AND_R_CA',
+  'OR_R_CA',
+  'XOR_R_CA',
+  'SHL_R_CA',
+  'SHR_R_CA',
+  'MOV_R_CA',
+  'MOV_CA_R',
+  'MOV_CA_C',
+  'CMP_R_CA',
+  'PUSH_CA',
+  'JMP_CA',
+  'JE_CA',
+  'JNE_CA',
+  'JG_CA',
+  'JGE_CA',
+  'JL_CA',
+  'JLE_CA',
+  'CALL_CA'
 ];
 
 module.exports = {

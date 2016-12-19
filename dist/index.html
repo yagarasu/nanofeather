@@ -45,7 +45,7 @@
         background: #0000aa;
         color: #ffffff;
         font-family: monospace;
-        font-size: 21px;
+        font-size: 16px;
         border: 0px;
         resize: none;
       }
@@ -54,7 +54,7 @@
         flex-flow: column;
       }
       #screen-output {
-        height: 230px;
+        height: 250px;
         background: #333;
         text-align: center;
       }
@@ -136,22 +136,35 @@
         flex: 0 0 auto;
         width: calc(100%/5);
       }
+      #ctrls {
+        display: flex;
+        flex-flow: row;
+      }
+      .ctrl-grp {
+        width: calc(100% / 3);
+      }
+      .ctrl-grp h2 {
+        font-size: 12px;
+      }
+      .ctrl-grp button {
+        border: 1px solid #aaaaaa;
+        color: #aaaaaa;
+        background: #000000;
+        width: 16px;
+        height: 16px;
+      }
     </style>
   </head>
   <body>
     <div id="main">
       <div id="code">
         <h2>Code editor</h2>
-        <textarea name="code"></textarea>
+        <textarea name="code" id="code-txt"></textarea>
         <div id="code-tools">
-          <div><kbd>Ctrl + P</kbd> Pause/esume</div>
+          <div><kbd>Ctrl + P</kbd> Pause/Resume</div>
           <div><kbd>Ctrl + D</kbd> Toggle debug</div>
-          <div><kbd>Shft + DOWN</kbd> Slower clock</div>
-          <div><kbd>Shft + UP</kbd> Faster clock</div>
-          <div><kbd>Shft + RIGHT</kbd> Set clock</div>
-          <div><kbd>Alt + DOWN</kbd> MemView down</div>
-          <div><kbd>Alt + UP</kbd> MemView up</div>
-          <div><kbd>Alt + RIGHT</kbd> Set MemView pos</div>
+          <div><kbd>Ctrl + C</kbd> Compile and load</div>
+          <div><kbd>Ctrl + R</kbd> Reset</div>
         </div>
       </div>
       <div id="screen">
@@ -178,6 +191,20 @@
             <div>Z: <span id="flag-Z">0</span></div>
             <div>S: <span id="flag-S">0</span></div>
             <div>O: <span id="flag-O">0</span></div>
+          </div>
+          <div id="ctrls">
+            <div class="ctrl-grp">
+              <h2>Clock</h2>
+              <button id="ctrl-speed-up">↑</button>
+              <button id="ctrl-speed-down">↓</button>
+              <button id="ctrl-speed-set">☚</button>
+            </div>
+            <div class="ctrl-grp">
+              <h2>MemView</h2>
+              <button id="ctrl-mv-up">↑</button>
+              <button id="ctrl-mv-down">↓</button>
+              <button id="ctrl-mv-set">☚</button>
+            </div>
           </div>
         </div>
         <div id="screen-mem">

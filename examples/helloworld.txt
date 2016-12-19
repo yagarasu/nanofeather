@@ -22,3 +22,33 @@
   54, 0x18,     // JMP 0x18     ; Jump back to the loop
   
   0,            // HLT
+  
+  
+; Print "Hello, World!"
+JMP start ; To the begining of execution
+  
+; Data
+; H     E     L     L     O     ,    W     O     R     L     D     !    <null>
+hello: DB "HELLO, WORLD!"
+
+     
+; Start program
+start:
+  MOV XL, 0xE0 ; Set X to Screen mem
+  MOV XH, 0xF6
+  
+  MOV A, hello  ; point string to A
+  
+loop:
+  MOV B, [A]   ; Add color flags
+  CMP B, 0     ; Compare char with null
+  JE end      ; Jump out of loop if null found
+  OR B, 0xC0   ;  to char into B from A pointer  | 0b1100 0000
+  MOV [X], B   ; Print char to screen
+  INC X        ; Increment screen pointer
+  INC A        ; Increment string pointer
+  JMP loop     ; Jump back to the loop
+  
+end:
+  HLT
+  

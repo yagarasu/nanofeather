@@ -58,4 +58,18 @@ Memory.prototype.getMap = function (address, length) {
   return new Uint8Array(this._raw, address, length);
 }
 
+Memory.prototype.clean = function () {
+  for (var i = 0; i < this._raw.length; i++) {
+    this.writeMem(i, 0);
+  }
+  this.writeReg(0,0);
+  this.writeReg(1,0);
+  this.writeReg(2,0);
+  this.writeReg(3,0);
+  this.writeReg(4,0);
+  this.writeReg(5,0);
+  this.writeReg(6,0);
+  this.writeReg(7,0);
+};
+
 module.exports = Memory;

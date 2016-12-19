@@ -1,0 +1,52 @@
+//   // Type in screen
+  
+//   // Screen mem in X / Cursor pos
+//   42, 4, 0xE0,  // MOV XL, 0xE0
+//   42, 5, 0xF6,  // MOV XH, 0xF6
+  
+//   // Screen limit in Y
+//   // off: 6
+//   42, 6, 0xF7,  // MOV YL, 0xF7
+//   42, 7, 0x30,  // MOV YH, 0x30
+  
+//   // Add prompt
+//   // off: 12
+//   45, 20, 0xC5, // MOV [X], 0xC5
+  
+//   // Check keystrokes
+//   // off: 15
+//   42, 0, 0,     // MOV A, 0x0
+//   81, 0,        // INT 0x0; A=0
+//   76, 3, 0,     // CMP D, 0 ; No new keys
+//   57, 15,        // JE 15; Jump to loop
+  
+//   // off: 25
+//   42, 0, 3,     // MOV A, 0x3 ; Copy keyboard buffer[B] to X, ORed with C
+//   42, 1, 0,     // MOV B, 0
+//   42, 2, 0xC0,  // MOV C, 0xC0; OR with white
+//   81, 0,        // INT 0x0; A=3
+  
+//   // off: 36
+//   42, 0, 4,     // MOV A, 0x4; Force shift
+//   81, 0,        // INT 0x0; A=4
+//   42, 3, 0,     // MOV D, 0x0
+//   17, 20,       // INC X
+  
+//   // off: 46
+//   73, 20, 22,   // CMP X, Y
+//   57, 53,       // JE 53
+//   54, 72,       // JMP 72
+  
+//   // off: 53
+//   47, 2,          // PUSH C
+//   42, 2, 80,      // MOV C, 80; Counter to 80
+//   42, 0, 5,       // MOV A, 0x5; Force shift left
+//   81, 0,          // INT 0x0; A=5
+//   18, 2,          // DEC C
+//   73, 2, 0,       // CMP C, 0
+//   60, 59,         // JNE 59
+//   51, 2,          // POP C
+  
+//   // off: 72
+//   45, 20, 0xC5, // MOV [X], 0xC5
+//   54, 15         // JMP 15; Return to main loop

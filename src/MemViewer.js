@@ -1,3 +1,5 @@
+var Clock = require('./Clock');
+
 var MemViewer = function (canvas, buffer, offset) {
   this.canvas = canvas;
   this.ctx = canvas.getContext('2d');
@@ -5,7 +7,10 @@ var MemViewer = function (canvas, buffer, offset) {
   this.offset = offset;
   this.pxSize = 4;
   this.viewportLength = 1024;
-  console.log(this.viewportLength);
+  this.clock = new Clock(500);
+  this.clock.on('tick', function () {
+    this.render();
+  }.bind(this));
 };
 
 MemViewer.prototype.getPx = function (val) {
@@ -14,7 +19,6 @@ MemViewer.prototype.getPx = function (val) {
 
 MemViewer.prototype.render = function () {
   var len = (this.offset + this.viewportLength > this.buffer.byteLength) ? undefined : this.viewportLength;
-  console.log(this.buffer, this.offset, len);
   var data = new Uint8Array(this.buffer, this.offset, len);
   var vpw = Math.floor(this.canvas.width / 4);
   for (var o = 0; o < this.viewportLength; o++) {
@@ -23,6 +27,13 @@ MemViewer.prototype.render = function () {
     this.ctx.fillStyle = '#' + ccc;
     this.ctx.fillRect(this.getPx(x), this.getPx(y), this.getPx(1), this.getPx(1));
   }
+};
+
+MemViewer.prototype.start = function () {
+  this.clock.start();
+};
+MemViewer.prototype.stop = function () {
+  this.clock.stop();
 };
 
 module.exports = MemViewer;

@@ -1,7 +1,7 @@
 var opcodes = require('./opcodes');
 var Memory = require('../Memory');
 var Screen = require('../Screen');
-var Clock = require('./Clock');
+var Clock = require('../Clock');
 
 /*
 Jumps:
@@ -75,6 +75,13 @@ CPU.prototype.installDevice = function (device) {
 CPU.prototype.iret = function () {
   this.clock.start();
   this.halted = false;
+  this.flags = {
+    carry: false,
+    parity: false,
+    zero: false,
+    sign: false,
+    overflow: false
+  };
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -88,6 +95,12 @@ CPU.prototype.loadProgram = function (prog, offset) {
 CPU.prototype.getNextByte = function () {
   this.log('> getNextByte');
   return this.memory.readMem(this.PC++);
+};
+
+CPU.prototype.reset = function () {
+  this.PC = 0;
+  this.SP = this.SBP;
+  this.memory.clean();
 };
 
 CPU.prototype.halt = function () {
@@ -274,7 +287,13 @@ CPU.prototype.step = function () {
           this.memory.writeMem(addr, val);
         } else if (parsed.arg1type === 'A') {
           var addr = this.getNextArgValue('A');
+          var addrInAddr = this.memory.readMem(addr);
           var val = this.getNextArgValue(parsed.arg2type);
+          this.log('MOV', '[addr]', addrInAddr, '<-', val);
+          this.memory.writeMem(addrInAddr, val);
+        } else if (parsed.arg1type === 'CA') {
+          var addr = this.getNextArgValue('CA');
+          val = this.getNextArgValue(parsed.arg2type);
           this.log('MOV', 'addr', addr, '<-', val);
           this.memory.writeMem(addr, val);
         }
@@ -383,6 +402,9 @@ CPU.prototype.getNextArgValue = function (argtype) {
   } else if (argtype === 'A') {
     var addr1 = this.getNextByte(), addr2 = this.getNextByte(), addr = (addr1 << 8) + addr2;
     return this.memory.readMem(addr);
+  } else if (argtype === 'CA') {
+    var addr1 = this.getNextByte(), addr2 = this.getNextByte(), addr = (addr1 << 8) + addr2;
+    return addr;
   } else if (argtype === 'C') {
     return this.getNextByte();
   }
