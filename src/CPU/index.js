@@ -1,16 +1,9 @@
+var opcodes = require('./opcodes');
 var Memory = require('../Memory');
 var Screen = require('../Screen');
-
-var log = function () {
-  var debug = true;
-  if (debug) {
-    console.log.apply(this, arguments);
-  }
-};
+var Clock = require('../Clock');
 
 /*
-Opcode design:
-- http://www.c-jump.com/CIS77/CPU/IsaDesign/lecture.html
 Jumps:
 - http://unixwiz.net/techtips/x86-jumps.html
 On how the flags are set:
@@ -18,16 +11,77 @@ On how the flags are set:
 */
 
 var CPU = function (options) {
+  this.debug = true;
+  
   this.memory = new Memory();
   window.memory = this.memory;
-  this.output = options.output;
-  this.outputMemory = this.memory.getMap(0x1C1F, 800);
-  this.screen = new Screen(this.output, this.outputMemory);
-  this.screen.render();
-  this.PC = 0x0000;
-  this.SP = 0x1C1F;
+  
+  this.clock = new Clock(10);
+  this.clock.on('tick', this.step.bind(this));
+  this.clock.on('tick', function () { this.log('Tick'); }.bind(this));
+  this.clock.on('start', function () { this.log('Clock started.'); }.bind(this));
+  this.clock.on('stop', function () { this.log('Clock stopped.'); }.bind(this));
+  
+  if (options.output) {
+    this.output = options.output;
+    this.outputMemory = this.memory.getMap(0xF6E0, 800);
+    this.screen = new Screen(this.output, this.outputMemory);
+    this.screen.clear();
+    this.clock.on('tick', function () { this.screen.render(); }.bind(this));
+  }
+  
+  this.interrupts = {};
+  this.devices = [];
+  
+  this.PC = (options.startAt !== undefined && options.startAt < 0xFFFF) ? options.startAt : 0x0000;
+  this.SP = this.SBP = (options.stackAddr !== undefined && options.stackAddr < 0xFFFF) ? options.stackAddr : 0xF5DF;
+  this.flags = {
+    carry: false,
+    parity: false,
+    zero: false,
+    sign: false,
+    overflow: false
+  };
+  this.halted = true;
+};
+
+CPU.prototype.toggleDebug = function () {
+  this.debug = !this.debug;
+};
+
+CPU.prototype.log = function () {
+  if (this.debug) {
+    var args = Array.prototype.slice.call(arguments);
+    console.log(args.map(function (e) { return (typeof e === 'string') ? e : JSON.stringify(e) }).join("\t"));
+  }
+};
+
+CPU.prototype.assignInterrupt = function (iden, interrupt) {
+  this.interrupts[iden] = interrupt;
+};
+
+CPU.prototype.callInterrupt = function (iden) {
+  this.clock.stop();
+  this.halted = true;
+  this.interrupts[iden].call(this, this.memory, this.PC, this.SP);
+};
+
+CPU.prototype.installDevice = function (device) {
+  this.devices.push(device);
+  var args = [this].concat(Array.prototype.slice.call(arguments));
+  device.apply(this, args);
+};
+
+CPU.prototype.iret = function () {
+  this.clock.start();
   this.halted = false;
-  this.timer = null;
+  this.flags = {
+    carry: false,
+    parity: false,
+    zero: false,
+    sign: false,
+    overflow: false
+  };
 };
 
 CPU.prototype.loadProgram = function (prog, offset) {
@@ -39,296 +93,359 @@ CPU.prototype.loadProgram = function (prog, offset) {
 };
 
 CPU.prototype.getNextByte = function () {
-  log('getNextByte');
+  this.log('> getNextByte');
   return this.memory.readMem(this.PC++);
 };
 
-CPU.prototype.setFlag = function(flag, testCond) {
-  if (testCond) {
-    this.memory.setFlag(flag);
-  } else {
-    this.memory.resetFlag(flag);
-  }
+CPU.prototype.reset = function () {
+  this.PC = 0;
+  this.SP = this.SBP;
+  this.memory.clean();
 };
 
-CPU.prototype.step = function () {
-  log('===== address:', this.PC.toString(16), '=====');
-  var cmd = this.getNextByte();
-  log(cmd.toString(2));
-  // 0x00 HLT
-  if (cmd == 0x00) {
-    this.halt();
-    return;
-  }
-  
-  // Not prefixed
-  if (cmd >> 5 !== 0) {
-    var op = (cmd & 0xE0) >> 5; // 1110 0000
-    var rr = (cmd & 0x18) >> 3; // 0001 1000
-    var mmm = cmd & 0x7; // 0000 0111
-    log('op', op.toString(2), 'rr', rr.toString(2), 'mmm', mmm.toString(2));
-    var arg;
-    if (mmm & 0x4 === 0) {
-      log('Arg is reg');
-      // Arg is reg
-      arg = mmm & 0x3; // 0000 0011
-    } else {
-      if (mmm === 4) {
-        log('Arg is [B]')
-        // Arg is [B]
-        arg = this.memory.readMem(this.memory.readReg(1));
-      }
-      else if (mmm === 5) {
-        log('Arg is [B + offset]')
-        // Arg is [B + offset]
-        var offset = this.getNextByte();
-        arg = this.memory.readMem(this.memory.readReg(1) + offset);
-      }
-      else if (mmm === 6) {
-        log('Arg is [const]')
-        // Arg is [const]
-        var constant = this.getNextByte();
-        arg = this.memory.readMem(constant);
-      }
-      else if (mmm === 7) {
-        log('Arg is const')
-        // Arg is const
-        arg = this.getNextByte();
-      }
-    }
-    
-    // Parse op
-    switch (op) {
-      case 1:
-        log('OR')
-        // OR
-        var r = this.memory.writeReg(
-          rr,
-          this.memory.readReg(rr) | arg
-        );
-        this.setFlag('ZERO', (r === 0));
-        this.setFlag('PARITY', (r & 0x1) === 1);
-        break;
-      case 2:
-        log('AND')
-        // AND
-        var r = this.memory.writeReg(
-          rr,
-          this.memory.readReg(rr) & arg
-        );
-        this.setFlag('ZERO', (r === 0));
-        this.setFlag('PARITY', (r & 0x1) === 1);
-        break;
-      case 3:
-        log('CMP')
-        // CMP
-        var regCont = this.memory.readReg(rr);
-        var res = regCont - arg;
-        this.setFlag('ZERO', (res === 0));
-        this.setFlag('SIGN', (res >> 7));
-        this.setFlag('PARITY', (res & 0x1) === 1);
-        if (res > 255) {
-          this.setFlag('CARRY', true);
-          res = 0xFF;
-        } else {
-          this.setFlag('CARRY', false);
-        }
-        if (((regCont & 0x80) === (arg & 0x80)) && (res & 0x80) !== (regCont & 0x80)) {
-          this.setFlag('OVERFLOW', true);
-        } else {
-          this.setFlag('OVERFLOW', false);
-        }
-        break;
-      case 4:
-        log('SUB')
-        // SUB
-        var opA = this.memory.readReg(rr);
-        var res = opA - arg;
-        if (res > 255) {
-          this.setFlag('CARRY', true);
-          res = 0xFF;
-        } else {
-          this.setFlag('CARRY', false);
-        }
-        var r = this.memory.writeReg(rr, res);
-        this.setFlag('ZERO', (r === 0));
-        this.setFlag('SIGN', (r >> 7));
-        this.setFlag('PARITY', (r & 0x1) === 1);
-        if (((opA & 0x80) === (arg & 0x80)) && (r & 0x80) !== (opA & 0x80)) {
-          this.setFlag('OVERFLOW', true);
-        } else {
-          this.setFlag('OVERFLOW', false);
-        }
-        break;
-      case 5:
-        log('ADD', rr, arg)
-        // ADD
-        var opA = this.memory.readReg(rr);
-        var res = opA + arg;
-        if (res > 255) {
-          this.setFlag('CARRY', true);
-          res = 0xFF;
-        } else {
-          this.setFlag('CARRY', false);
-        }
-        this.memory.writeReg(rr, res);
-        this.setFlag('ZERO', (r === 0));
-        this.setFlag('SIGN', (r >> 7));
-        this.setFlag('PARITY', (r & 0x1) === 1);
-        if (((opA & 0x80) === (arg & 0x80)) && (r & 0x80) !== (opA & 0x80)) {
-          this.setFlag('OVERFLOW', true);
-        } else {
-          this.setFlag('OVERFLOW', false);
-        }
-        break;
-      case 6:
-        log('MOV reg, arg', rr, arg)
-        // MOV reg, arg
-        this.memory.writeReg(rr, arg);
-        break;
-      case 7:
-        log('MOV arg, reg', rr, arg)
-        // MOV arg, reg
-        this.memory.writeMem(arg, this.memory.readReg(rr));
-        break;
-      default:
-        throw new Error('Unknown sub-opcode:' + op);
-    }
-    return;
-  } else {
-    // Prefixed 000
-    var op = (cmd & 0x18) >> 3; // 1110 0000
-    var mmm = cmd & 0x7; // 0000 0111
-    log('op', op.toString(2), 'mmm', mmm.toString(2));
-    switch (op) {
-      case 1:
-        // JMP
-        var addr = this.getNextByte();
-        log('JMP');
-        if (mmm === 0) {
-          // JE
-          log('JE', addr);
-          if (this.memory.getFlag('ZERO')) {
-            this.PC = addr;
-          }
-          return;
-        }
-        else if (mmm === 1) {
-          // JNE
-          log('JNE', addr);
-          if (!this.memory.getFlag('ZERO')) {
-            this.PC = addr;
-          }
-          return;
-        }
-        else if (mmm === 2) {
-          // JL
-          log('JL', addr);
-          if (this.memory.getFlag('SIGN') !== this.memory.getFlag('OVERFLOW')) {
-            this.PC = addr;
-          }
-          return;
-        }
-        else if (mmm === 3) {
-          // JLE
-          log('JLE', addr);
-          if (!this.memory.getFlag('CARRY') || this.memory.getFlag('ZERO')) {
-            this.PC = addr;
-          }
-          return;
-        }
-        else if (mmm === 4) {
-          // JG
-          log('JG', addr);
-          if (!this.memory.getFlag('ZERO') && (this.memory.getFlag('SIGN') === this.memory.getFlag('OVERFLOW'))) {
-            this.PC = addr;
-          }
-          return;
-        }
-        else if (mmm === 5) {
-          // JGE
-          log('JGE', addr);
-          if (this.memory.getFlag('SIGN') === this.memory.getFlag('OVERFLOW')) {
-            this.PC = addr;
-          }
-          return;
-        }
-        else if (mmm === 6) {
-          // JMP
-          log('JMP', addr);
-          this.PC = addr;
-          return;
-        }
-        else {
-          throw new Error('Unknown jump');
-        }
-        break;
-      case 2:
-        log('NEG', mmm);
-        // NEG
-        if (mmm & 0x4 === 0) {
-          log('Arg is reg');
-          // Arg is reg
-          var reg = mmm & 0x3; // 0000 0011
-          this.memory.writeReg(reg,
-            ~this.memory.readReg(reg)
-          )
-        } else {
-          log('not zero?');
-          if (mmm === 4) {
-            log('Arg is [B]')
-            // Arg is [B]
-            var arg = this.memory.readMem(this.memory.readReg(1));
-            this.memory.writeMem(this.memory.readReg(1), ~arg);
-          }
-          else if (mmm === 5) {
-            log('Arg is [B + offset]')
-            // Arg is [B + offset]
-            var offset = this.getNextByte();
-            var arg = this.memory.readMem(this.memory.readReg(1) + offset);
-            this.memory.writeMem(this.memory.readReg(1) + offset, ~arg);
-          }
-          else if (mmm === 6) {
-            log('Arg is [const]')
-            // Arg is [const]
-            var constant = this.getNextByte();
-            var arg = this.memory.readMem(constant);
-            this.memory.writeMem(constant, ~arg);
-          }
-          else if (mmm === 7) {
-            log('Arg is const')
-            throw new Error('Invalid NOT operation');
-          }
-        }
-        break;    
-      default:
-        throw new Error('Unknown sub-opcode:', op);
-    }
-    return;
-  }
-  
-  // Default    
-  log('Default', cmd);
-  this.PC++;
-  return;
+CPU.prototype.halt = function () {
+  this.clock.stop();
+  this.halted = true;
 };
 
 CPU.prototype.run = function () {
   this.halted = false;
-  
-  this.clock = setInterval(function () {
-    this.step();
-  }.bind(this), 1000);
-  // while (!this.halted) {
-  //   this.step();
-  // }
+  this.clock.start();
 };
 
-CPU.prototype.halt = function () {
-  log('HALTED');
-  this.halted = true;
-  clearInterval(this.clock);
-  this.clock = null;
+CPU.prototype.step = function () {
+  this.log('===== ADDR:', '0x'+this.PC.toString(16).lpad(4), '=====');
+  if (this.halted) return;
+  try {
+    var bc = this.getNextByte();
+    var parsed = this.parseBytecode(bc);
+    this.log(parsed);
+    switch (parsed.cmd) {
+      case 'HLT':
+        this.halt();
+        break;
+      
+      case 'INC':
+        var reg = this.getNextByte();
+        var regCont = this.memory.readReg(reg);
+        var res = regCont + 1;
+        if (reg <= 0xF) {
+          res = this.setFlagsMath(regCont, 1, res);  
+        } else {
+          res = this.setFlagsMath16(regCont, 1, res);  
+        }
+        this.log('INC', reg, '=', res);
+        this.memory.writeReg(reg, res);
+        break;
+        
+      case 'DEC':
+        var reg = this.getNextByte();
+        var regCont = this.memory.readReg(reg);
+        var res = regCont - 1;
+        if (reg <= 0xF) {
+          res = this.setFlagsMath(regCont, 1, res);  
+        } else {
+          res = this.setFlagsMath16(regCont, 1, res);  
+        }
+        this.log('DEC', reg, '=', res);
+        this.memory.writeReg(reg, res);
+        break;
+        
+      case 'ADD':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont + arg2;
+        this.log('ADD', regA, regCont, '+', arg2, '=', res);
+        res = this.setFlagsMath(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'SUB':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont - arg2;
+        this.log('SUB', regA, regCont, '-', arg2, '=', res);
+        res = this.setFlagsMath(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+      
+      case 'MUL':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont * arg2;
+        this.log('MUL', regA, regCont, '*', arg2, '=', res);
+        res = this.setFlagsMath(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'DIV':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = Math.round(regCont / arg2);
+        this.log('DIV', regA, regCont, '/', arg2, '=', res);
+        res = this.setFlagsMath(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'CMP':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont - arg2;
+        this.log('CMP', regA, regCont, '?', arg2, '=', res);
+        res = this.setFlagsMath(regCont, arg2, res);
+        break;
+        
+      case 'AND':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont & arg2;
+        this.log('AND', regA, regCont, '&', arg2, '=', res);
+        res = this.setFlagsBit(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'OR':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont | arg2;
+        this.log('OR', regA, regCont, '|', arg2, '=', res);
+        res = this.setFlagsBit(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+      
+      case 'XOR':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = regCont ^ arg2;
+        this.log('XOR', regA, regCont, '^', arg2, '=', res);
+        res = this.setFlagsBit(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'SHL':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = (regCont << arg2) & 0xFF;
+        this.log('SHL', regA, regCont, '<<', arg2, '=', res);
+        res = this.setFlagsBit(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'SHR':
+        // Get first arg
+        var regA = this.getNextByte();
+        var regCont = this.memory.readReg(regA);
+        var arg2 = this.getNextArgValue(parsed.arg2type);
+        var res = (regCont >> arg2) && 0xFF;
+        this.log('SHR', regA, regCont, '>>', arg2, '=', res);
+        res = this.setFlagsBit(regCont, arg2, res);
+        this.memory.writeReg(regA, res);
+        break;
+        
+      case 'PUSH':
+        var arg = this.getNextArgValue(parsed.arg1type);
+        this.log('PUSH', this.SP, '<-', arg);
+        this.memory.writeMem(this.SP--, arg);
+        break;
+        
+      case 'POP':
+        var reg = this.getNextByte();
+        var val = this.memory.readMem(++this.SP);
+        this.log('POP', this.SP-1, '->', reg);
+        this.memory.writeReg(reg, val);
+        break;
+        
+      case 'MOV':
+        if (parsed.arg1type === 'R') {
+          var reg = this.getNextByte();
+          var val = this.getNextArgValue(parsed.arg2type);
+          this.log('MOV', 'reg', reg, '<-', val);
+          this.memory.writeReg(reg, val);
+        } else if (parsed.arg1type === 'RA') {
+          var reg = this.getNextByte();
+          var addr = this.memory.readReg(reg);
+          var val = this.getNextArgValue(parsed.arg2type);
+          this.log('MOV', '[reg]=', addr, '<-', val);
+          this.memory.writeMem(addr, val);
+        } else if (parsed.arg1type === 'A') {
+          var addr = this.getNextArgValue('A');
+          var addrInAddr = this.memory.readMem(addr);
+          var val = this.getNextArgValue(parsed.arg2type);
+          this.log('MOV', '[addr]', addrInAddr, '<-', val);
+          this.memory.writeMem(addrInAddr, val);
+        } else if (parsed.arg1type === 'CA') {
+          var addr = this.getNextArgValue('CA');
+          val = this.getNextArgValue(parsed.arg2type);
+          this.log('MOV', 'addr', addr, '<-', val);
+          this.memory.writeMem(addr, val);
+        }
+        break;
+        
+      case 'JMP':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        this.PC = addr;
+        break;
+        
+      case 'JE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JNE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (!this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JG':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.sign !== this.flags.overflow) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JGE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.carry || this.flags.zero) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JL':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (!this.flags.zero && (this.flags.sign === this.flags.overflow)) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'JLE':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        if (this.flags.sign === this.flags.overflow) {
+          this.PC = addr;
+        }
+        break;
+        
+      case 'CALL':
+        var addr = this.getNextArgValue(parsed.arg1type);
+        this.memory.writeMem(this.SP--, this.PC);
+        this.PC = addr;
+        break;
+        
+      case 'RET':
+        var addr = this.memory.readMem(++this.SP);
+        this.PC = addr;
+        break;
+        
+      case 'INT':
+        var interrupt = this.getNextByte();
+        this.callInterrupt(interrupt);
+        break;
+        
+      case 'BRK':
+        this.halt();
+        this.log('Break at', this.PC.toString(16));
+        this.log('Registers', this.memory.regs8, this.memory.regs16);
+        break;
+        
+      default:
+        this.log('Not implemented yet:' + parsed.cmd);
+    }
+  } catch (e) {
+    this.halt();
+    throw e;
+  }
+};
+
+CPU.prototype.parseBytecode = function (bc) {
+  var op = opcodes.bcs[bc];
+  var parts = op.match(/^([A-Z]+)(_([A-Z]+))?(_([A-Z]+))?$/);
+  if (parts === null) throw new Error('Illegal opcode found: ' + bc);
+  var cmd = parts[1],
+      ret = { cmd: cmd };
+  if (parts.length > 2) {
+    ret.arg1type = parts[3];
+  }
+  if (parts.length > 4) {
+    ret.arg2type = parts[5];
+  }
+  return ret;
+};
+
+CPU.prototype.getNextArgValue = function (argtype) {
+  if (argtype === 'R') {
+    var reg = this.getNextByte();
+    return this.memory.readReg(reg);
+  } else if (argtype === 'RA') {
+    var reg = this.getNextByte();
+    return this.memory.readMem(this.memory.readReg(reg));
+  } else if (argtype === 'A') {
+    var addr1 = this.getNextByte(), addr2 = this.getNextByte(), addr = (addr1 << 8) + addr2;
+    return this.memory.readMem(addr);
+  } else if (argtype === 'CA') {
+    var addr1 = this.getNextByte(), addr2 = this.getNextByte(), addr = (addr1 << 8) + addr2;
+    return addr;
+  } else if (argtype === 'C') {
+    return this.getNextByte();
+  }
+};
+
+CPU.prototype.setFlagsMath = function (A, B, res) {
+  this.flags.zero = (res === 0);
+  this.flags.sign = (res >> 7) > 0;
+  this.flags.parity = !!(res & 0x1);
+  this.flags.overflow = ((A & 0x80) === (B & 0x80)) && (res & 0x80) !== (A & 0x80);
+  if (res > 255 || res < 0) {
+    this.flags.carry = true;
+    res = res && 0xFF;
+  } else {
+    this.flags.carry = false;
+  }
+  this.log('FLAGS:', this.flags);
+  return res;
+};
+
+CPU.prototype.setFlagsMath16 = function (A, B, res) {
+  this.flags.zero = (res === 0);
+  this.flags.sign = (res >> 7) > 0;
+  this.flags.parity = !!(res & 0x1);
+  this.flags.overflow = ((A & 0x8000) === (B & 0x8000)) && (res & 0x8000) !== (A & 0x8000);
+  if (res > 0xFFFF || res < 0) {
+    this.flags.carry = true;
+    res = res && 0xFFFF;
+  } else {
+    this.flags.carry = false;
+  }
+  this.log('FLAGS:', this.flags);
+  return res;
+};
+
+CPU.prototype.setFlagsBit = function (A, B, res) {
+  this.flags.zero = (res === 0);
+  this.flags.sign = (res >> 7) > 0;
+  this.flags.parity = (res & 0x1);
+  this.log('FLAGS:', this.flags);
+  return res;
 };
 
 module.exports = CPU;

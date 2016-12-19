@@ -1,76 +1,34 @@
-opcodes
+# Op code design
 
-Arg types
-<const> - constant value
-<reg> - register (constant address?)
-<address> - address
-<effective address of ref>
+## Commands 
 
--- halt
-[X]     HLT - Halt program
--- data
-[X]     MOV - Move data from one point to other
-[ ]     PUSH - Push data into stack
-[ ]     POP - Pop data from stack
--- alu
-[X]     ADD - Add
-[X]     SUB - Substract
-[ ]     INC - Increment
-[ ]     DEC - Decrement
-[ ]     MUL - Multiply *
-[ ]     DIV - Divide *
-[X]     AND - Logical and
-[X]     OR - Logical or
-[ ]     XOR - Logical exclusive or
-[ ]     NOT - Negate (?)
-[X]     NEG - 2s comp
-[ ]     SHL - Shift left
-[ ]     SHR - Shift right
--- flow
-[X]     JMP - jump
-[X]     JE - jump if equal
-[X]     JNE - jump if not equal
-[X]     JZ - jump if zero
-[X]     JG - jump if greater than
-[X]     JGE - jump if greater than or equal
-[X]     JL - jump if lesser than
-[X]     JLE - jump if lesser than or equal
-[X]     CMP - compare
-[ ]     CALL - call subroutine
-[ ]     RET - return from subroutine
+- HLT - Halt program                                1
 
+- ADD rr, (rr|mm|dd) - Add                          3
+- SUB rr, (rr|mm|dd) - Substract                    3
+- MUL rr, (rr|mm|dd) - Multiply *                   3
+- DIV rr, (rr|mm|dd) - Divide *                     3
+- INC (rr|mm) - Increment                           2
+- DEC (rr|mm) - Decrement                           2
+- AND rr, (rr|mm|dd) - Logical and                  3
+- OR  rr, (rr|mm|dd) - Logical or                   3
+- XOR rr, (rr|mm|dd) - Logical exclusive or         3
+- SHL (rr|mm) - Shift left                          2
+- SHR (rr|mm) - Shift right                         2
+                                                    30
 
-0000 0000 HLT - 0x00
+- MOV (rr|mm), (rr|mm|cc) - Move data               6
+- PUSH (rr|mm|cc) - Push data into stack            3
+- POP (rr) - Pop data from stack                    1
+                                                    10
 
-1 byte instr (1 byte arg) iiir rmmm: aaaa aaaa
-
-iii             rr          mmm:
-000 - exp
-
-001 - OR        00 A        000 A
-010 - AND       01 B        001 B
-011 - CMP       10 C        010 C
-100 - SUB       11 D        011 D
-101 - ADD                   100 [reg]
-110 - MOV rr, mmm           101 [reg + offset]
-111 - MOV mmm, rr           110 [const]
-                            111 const
-
-Expansion set
-000i immm: aaaa aaaa
-
-prefix          ii          mmm
-000             00 - exp
-                01 - JMP                <address>
-                            000 JE
-                            001 JNE
-                            010 JL
-                            011 JLE
-                            100 JG
-                            101 JGE
-                            110 JMP
-                            111 - not assigned
-                10 - NOT    <same mmm as prev sec>
-                11 - not assigned
-
-
+- JMP (rr|mm|cc) - jump                             3
+- JE  (rr|mm|cc) - jump if equal                    3
+- JNE (rr|mm|cc) - jump if not equal                3
+- JG  (rr|mm|cc) - jump if greater than             3
+- JGE (rr|mm|cc) - jump if greater than or equal    3
+- JL  (rr|mm|cc) - jump if lesser than              3
+- JLE (rr|mm|cc) - jump if lesser than or equal     3
+- CMP (rr|mm), (rr|mm|cc) - compare                 6
+- CALL (rr|mm|cc) - call subroutine                 3
+- RET - return from subroutine                      1

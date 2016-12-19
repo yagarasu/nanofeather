@@ -1,15 +1,44 @@
+var WIDTH = 100,
+    HEIGHT = 32,
+    COLOR_BLACK = '#000000',
+    COLOR_WHITE = '#FFFFFF',
+    COLOR_GREEN = '#00AA00',
+    COLOR_RED = '#AA0000',
+    COLORMAP = [COLOR_BLACK, COLOR_GREEN, COLOR_RED, COLOR_WHITE],
+    MODE_TEXT = 0x0;
+    
+var CHARMAP = [
+      //  0    1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+/* 0 */  null,'+','-','*','/','_','.',',',';','>','<','?','!','"','(',')',
+/* 1 */  '0' ,'1','2','3','4','5','6','7','8','9','=',':','[',']','{','}',
+/* 2 */  ' ' ,'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
+/* 3 */  'P' ,'Q','R','S','T','U','V','W','X','Y','Z','@','#','$','%','&'
+];
+
+var memPerPageByMode = {
+  0x0: 80
+};
+
 var Screen = function (outputElement, screenMem) {
   this.pxSize = 4;
   this.el = outputElement;
   this.ctx = this.el.getContext('2d');
   this.setupElement();
   this.mem = screenMem;
+  this.mode = MODE_TEXT;
+  this.memBase = 0;
+  this.memPerPage = memPerPageByMode[this.mode];
+  this.charmap = CHARMAP;
 };
 
 Screen.prototype.setupElement = function () {
-  this.el.width = this.realPxToscrPx(100).toString();
-  this.el.height = this.realPxToscrPx(32).toString();
+  this.el.width = this.realPxToscrPx(WIDTH).toString();
+  this.el.height = this.realPxToscrPx(HEIGHT).toString();
   this.clear();
+};
+
+Screen.prototype.setMemBase = function (offset) {
+  this.memBase = offset;
 };
 
 Screen.prototype.realPxToscrPx = function (px) {
@@ -20,45 +49,42 @@ Screen.prototype.scrPxTorealPx = function (px) {
   return Math.floor(px / 4);
 };
 
-Screen.prototype.getColorHex = function (bits) {
-  switch (bits) {
-    case 0: return '#000000'; break;
-    case 1: return '#AA0000'; break;
-    case 2: return '#00AA00'; break;
-    case 3: return '#FFFFFF'; break;
-    default: return '#00AA00'; break;
-  }
-};
-
 Screen.prototype.clear = function () {
-  this.ctx.fillStyle = '#000000';
-  this.ctx.fillRect(0,0,this.realPxToscrPx(100),this.realPxToscrPx(32));
+  this.ctx.fillStyle = COLOR_BLACK;
+  this.ctx.fillRect(0, 0, this.realPxToscrPx(WIDTH), this.realPxToscrPx(HEIGHT));
 };
 
-Screen.prototype.putPx = function (x, y, color) {
-  this.ctx.fillStyle = color;
-  var rx = this.realPxToscrPx(x);
-  var ry = this.realPxToscrPx(y);
-  var pxwh = this.realPxToscrPx(1);
-  this.ctx.fillRect(rx, ry, pxwh, pxwh);
+Screen.prototype.setMode = function (mode) {
+  this.clear();
+  this.memBase = 0;
+  
+  this.mode = mode;
 };
 
-Screen.prototype.render = function () {
-  for (var offset = 0; offset < this.mem.length; offset++) {
-    var byte = this.mem[offset];
-    var px1 = (byte & 0xC0) >> 6, // 1100 0000
-        px2 = (byte & 0x30) >> 4, // 0011 0000
-        px3 = (byte & 0x0C) >> 2, // 0000 1100
-        px4 = byte & 0x03; // 0000 0011
-    var x1 = (offset % 25) * 4,
-        x2 = x1 + 1,
-        x3 = x1 + 2,
-        x4 = x1 + 3;
-    var y = Math.floor(offset / 25);
-    this.putPx(x1, y, this.getColorHex(px1));
-    this.putPx(x2, y, this.getColorHex(px2));
-    this.putPx(x3, y, this.getColorHex(px3));
-    this.putPx(x4, y, this.getColorHex(px4));
+Screen.prototype.render = function (noClear) {
+  if (!noClear) { this.clear(); }
+  switch (this.mode) {
+    case MODE_TEXT:
+      this.renderText();
+      break;
+    default:
+      throw new Error('Unknown mode ' + this.mode);
+  }
+}
+
+Screen.prototype.renderText = function () {
+  this.ctx.font = this.realPxToscrPx(8) + 'px monospace';
+  this.ctx.textBaseline = "top";
+  for (var o = 0; o < this.memPerPage; o++) {
+    var offset = o + this.memBase,
+      cbyte = this.mem[offset],
+      status = (cbyte & 0b11000000) >> 6,
+      char = (cbyte & 0b00111111),
+      str = CHARMAP[char],
+      x = o % 20,
+      y = Math.floor(o / 20);
+    this.ctx.fillStyle = COLORMAP[status];
+    this.ctx.fillText(str, this.realPxToscrPx(x) * 5, this.realPxToscrPx(y) * 8, this.realPxToscrPx(5));
   }
 };
 

@@ -5,7 +5,8 @@
   "main": "index.html",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "./node_modules/.bin/browserify ./src/index.js -o ./dist/bundle.js"
+    "build": "./node_modules/.bin/browserify ./src/index.js -o ./dist/bundle.js",
+    "build:peg": "./node_modules/.bin/pegjs -o ./src/asmparser/parser.js ./peg/grammar.pegjs"
   },
   "repository": {
     "type": "git",
@@ -18,6 +19,7 @@
   },
   "homepage": "https://github.com/yagarasu/nanofeather#readme",
   "dependencies": {
-    "browserify": "^13.1.1"
+    "browserify": "^13.1.1",
+    "pegjs": "^0.10.0"
   }
 }

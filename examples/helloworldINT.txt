@@ -1,0 +1,14 @@
+// Print "Hello, World!" into console using an INT
+  54, 0xF, // JMP 0xF ; To the begining of execution
+  
+  // Data
+  // H     E     L     L     O     ,    W     O     R     L     D     !    <null>
+     0x28, 0x25, 0x2C, 0x2C, 0x2F, 0x7, 0x37, 0x2F, 0x32, 0x2C, 0x24, 0xC, 0x0,
+     
+  // Start program
+  
+  42, 4, 0x02,  // MOV XL, 0xE0 ; Set X to string
+  42, 0, 0x0,   // MOV A, 0x02  ; Set INT 0x1 argument to 0x0 (console log);
+  81, 0x1,      // INT 0x1      ; Call INT 01
+  
+  0,            // HLT
