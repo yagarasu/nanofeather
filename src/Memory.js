@@ -4,8 +4,16 @@ class Memory {
     this.mem = new Uint8Array(this.raw, 0)
   }
 
+  get length () {
+    return this.mem.length
+  }
+
   clean () {
     this.mem.fill(0x0)
+  }
+
+  set (source, offset) {
+    this.mem.set(source, offset)
   }
 
   write (address, value) {
