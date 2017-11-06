@@ -1,6 +1,6 @@
 class Memory {
   constructor () {
-    this.raw = new ArrayBuffer(255)
+    this.raw = new ArrayBuffer(0xFFFF)
     this.mem = new Uint8Array(this.raw, 0)
   }
 

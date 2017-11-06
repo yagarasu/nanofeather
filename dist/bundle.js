@@ -7530,6 +7530,820 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+
+exports.EventEmitter = EventEmitter;
+exports.listenerCount = listenerCount;
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+function EventEmitter() {
+  this._events = this._events || {};
+  this._maxListeners = this._maxListeners || undefined;
+}
+exports.default = EventEmitter;
+
+// Backwards-compat with node 0.10.x
+
+EventEmitter.EventEmitter = EventEmitter;
+
+EventEmitter.prototype._events = undefined;
+EventEmitter.prototype._maxListeners = undefined;
+
+// By default EventEmitters will print a warning if more than 10 listeners are
+// added to it. This is a useful default which helps finding memory leaks.
+EventEmitter.defaultMaxListeners = 10;
+var defaultMaxListeners = exports.defaultMaxListeners = 10;
+
+// Obviously not all Emitters should be limited to 10. This function allows
+// that to be increased. Set to zero for unlimited.
+EventEmitter.prototype.setMaxListeners = function (n) {
+  if (!isNumber(n) || n < 0 || isNaN(n)) throw TypeError('n must be a positive number');
+  this._maxListeners = n;
+  return this;
+};
+
+EventEmitter.prototype.emit = function (type) {
+  var er, handler, len, args, i, listeners;
+
+  if (!this._events) this._events = {};
+
+  // If there is no 'error' event listener then throw.
+  if (type === 'error') {
+    if (!this._events.error || isObject(this._events.error) && !this._events.error.length) {
+      er = arguments[1];
+      if (er instanceof Error) {
+        throw er; // Unhandled 'error' event
+      } else {
+        // At least give some kind of context to the user
+        var err = new Error('Uncaught, unspecified "error" event. (' + er + ')');
+        err.context = er;
+        throw err;
+      }
+    }
+  }
+
+  handler = this._events[type];
+
+  if (isUndefined(handler)) return false;
+
+  if (isFunction(handler)) {
+    switch (arguments.length) {
+      // fast cases
+      case 1:
+        handler.call(this);
+        break;
+      case 2:
+        handler.call(this, arguments[1]);
+        break;
+      case 3:
+        handler.call(this, arguments[1], arguments[2]);
+        break;
+      // slower
+      default:
+        args = Array.prototype.slice.call(arguments, 1);
+        handler.apply(this, args);
+    }
+  } else if (isObject(handler)) {
+    args = Array.prototype.slice.call(arguments, 1);
+    listeners = handler.slice();
+    len = listeners.length;
+    for (i = 0; i < len; i++) {
+      listeners[i].apply(this, args);
+    }
+  }
+
+  return true;
+};
+
+EventEmitter.prototype.addListener = function (type, listener) {
+  var m;
+
+  if (!isFunction(listener)) throw TypeError('listener must be a function');
+
+  if (!this._events) this._events = {};
+
+  // To avoid recursion in the case that type === "newListener"! Before
+  // adding it to the listeners, first emit "newListener".
+  if (this._events.newListener) this.emit('newListener', type, isFunction(listener.listener) ? listener.listener : listener);
+
+  if (!this._events[type])
+    // Optimize the case of one listener. Don't need the extra array object.
+    this._events[type] = listener;else if (isObject(this._events[type]))
+    // If we've already got an array, just append.
+    this._events[type].push(listener);else
+    // Adding the second element, need to change to array.
+    this._events[type] = [this._events[type], listener];
+
+  // Check for listener leak
+  if (isObject(this._events[type]) && !this._events[type].warned) {
+    if (!isUndefined(this._maxListeners)) {
+      m = this._maxListeners;
+    } else {
+      m = EventEmitter.defaultMaxListeners;
+    }
+
+    if (m && m > 0 && this._events[type].length > m) {
+      this._events[type].warned = true;
+      console.error('(node) warning: possible EventEmitter memory ' + 'leak detected. %d listeners added. ' + 'Use emitter.setMaxListeners() to increase limit.', this._events[type].length);
+      if (typeof console.trace === 'function') {
+        // not supported in IE 10
+        console.trace();
+      }
+    }
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+
+EventEmitter.prototype.once = function (type, listener) {
+  if (!isFunction(listener)) throw TypeError('listener must be a function');
+
+  var fired = false;
+
+  function g() {
+    this.removeListener(type, g);
+
+    if (!fired) {
+      fired = true;
+      listener.apply(this, arguments);
+    }
+  }
+
+  g.listener = listener;
+  this.on(type, g);
+
+  return this;
+};
+
+// emits a 'removeListener' event iff the listener was removed
+EventEmitter.prototype.removeListener = function (type, listener) {
+  var list, position, length, i;
+
+  if (!isFunction(listener)) throw TypeError('listener must be a function');
+
+  if (!this._events || !this._events[type]) return this;
+
+  list = this._events[type];
+  length = list.length;
+  position = -1;
+
+  if (list === listener || isFunction(list.listener) && list.listener === listener) {
+    delete this._events[type];
+    if (this._events.removeListener) this.emit('removeListener', type, listener);
+  } else if (isObject(list)) {
+    for (i = length; i-- > 0;) {
+      if (list[i] === listener || list[i].listener && list[i].listener === listener) {
+        position = i;
+        break;
+      }
+    }
+
+    if (position < 0) return this;
+
+    if (list.length === 1) {
+      list.length = 0;
+      delete this._events[type];
+    } else {
+      list.splice(position, 1);
+    }
+
+    if (this._events.removeListener) this.emit('removeListener', type, listener);
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.removeAllListeners = function (type) {
+  var key, listeners;
+
+  if (!this._events) return this;
+
+  // not listening for removeListener, no need to emit
+  if (!this._events.removeListener) {
+    if (arguments.length === 0) this._events = {};else if (this._events[type]) delete this._events[type];
+    return this;
+  }
+
+  // emit removeListener for all listeners on all events
+  if (arguments.length === 0) {
+    for (key in this._events) {
+      if (key === 'removeListener') continue;
+      this.removeAllListeners(key);
+    }
+    this.removeAllListeners('removeListener');
+    this._events = {};
+    return this;
+  }
+
+  listeners = this._events[type];
+
+  if (isFunction(listeners)) {
+    this.removeListener(type, listeners);
+  } else if (listeners) {
+    // LIFO order
+    while (listeners.length) {
+      this.removeListener(type, listeners[listeners.length - 1]);
+    }
+  }
+  delete this._events[type];
+
+  return this;
+};
+
+EventEmitter.prototype.listeners = function (type) {
+  var ret;
+  if (!this._events || !this._events[type]) ret = [];else if (isFunction(this._events[type])) ret = [this._events[type]];else ret = this._events[type].slice();
+  return ret;
+};
+
+EventEmitter.prototype.listenerCount = function (type) {
+  if (this._events) {
+    var evlistener = this._events[type];
+
+    if (isFunction(evlistener)) return 1;else if (evlistener) return evlistener.length;
+  }
+  return 0;
+};
+
+function listenerCount(emitter, type) {
+  return emitter.listenerCount(type);
+}
+EventEmitter.listenerCount = listenerCount;
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+
+function isObject(arg) {
+  return (typeof arg === 'undefined' ? 'undefined' : _typeof(arg)) === 'object' && arg !== null;
+}
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+
+},{}],327:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventsEs = require('events-es6');
+
+var _opcodes = require('./opcodes');
+
+var _opcodes2 = _interopRequireDefault(_opcodes);
+
+var _CPUFunctions = require('./CPUFunctions');
+
+var _CPUFunctions2 = _interopRequireDefault(_CPUFunctions);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var oplist = _opcodes2.default.oplist;
+
+var CPU = function (_EventEmitter) {
+  _inherits(CPU, _EventEmitter);
+
+  function CPU(_ref) {
+    var registers = _ref.registers,
+        memory = _ref.memory,
+        clock = _ref.clock,
+        flags = _ref.flags;
+
+    _classCallCheck(this, CPU);
+
+    var _this = _possibleConstructorReturn(this, (CPU.__proto__ || Object.getPrototypeOf(CPU)).call(this));
+
+    _this.flags = flags;
+    _this.registers = registers;
+    _this.memory = memory;
+    _this.clock = clock;
+    _this.clock.on('tick', _this.step.bind(_this));
+    _this.halted = true;
+    _this.clock.on('start', function () {
+      return _this.halted = false;
+    });
+    _this.clock.on('stop', function () {
+      return _this.halted = true;
+    });
+    _this.PC = 0;
+    _this.SP = _this.memory.length - 1;
+    return _this;
+  }
+
+  _createClass(CPU, [{
+    key: 'loadProgram',
+    value: function loadProgram(prog) {
+      var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+
+      this.memory.set(prog, offset);
+    }
+  }, {
+    key: 'reset',
+    value: function reset() {
+      this.clock.stop();
+      this.PC = 0;
+      this.SP = this.memory.length - 1;
+      this.memory.clean();
+    }
+  }, {
+    key: 'halt',
+    value: function halt() {
+      this.clock.stop();
+      this.emit('halt');
+    }
+  }, {
+    key: 'run',
+    value: function run() {
+      this.clock.start();
+      this.emit('start');
+    }
+  }, {
+    key: 'step',
+    value: function step() {
+      try {
+        var _getNextCommand = this.getNextCommand(),
+            cmd = _getNextCommand.cmd,
+            arg1 = _getNextCommand.arg1,
+            arg2 = _getNextCommand.arg2;
+
+        if (typeof _CPUFunctions2.default[cmd] !== "function") throw new Error('Unknown arg type "' + cmd + '"');
+        _CPUFunctions2.default[cmd](this, arg1, arg2);
+        this.emit('exec', cmd, arg1, arg2);
+      } catch (e) {
+        // ERR
+        throw e; // Bubble up
+      }
+    }
+  }, {
+    key: 'getNextByte',
+    value: function getNextByte() {
+      this.emit('pcinc');
+      return this.memory.read(this.PC++);
+    }
+  }, {
+    key: 'getNextCommand',
+    value: function getNextCommand() {
+      var bytecode = this.getNextByte();
+      var op = oplist[bytecode];
+      if (op === undefined) throw new Error('Ilegal opcode found: ' + bytecode);
+      var parts = op.match(/^([A-Z]+)(_([A-Z]+))?(_([A-Z]+))?$/);
+      var cmd = { cmd: parts[1] };
+      if (parts[3] !== undefined) {
+        cmd.arg1 = Object.assign({ type: parts[3] }, this.getNextArg(parts[3]));
+      }
+      if (parts[5] !== undefined) {
+        cmd.arg2 = Object.assign({ type: parts[5] }, this.getNextArg(parts[5]));
+      }
+      return cmd;
+    }
+  }, {
+    key: 'getNextArg',
+    value: function getNextArg(type) {
+      var _this2 = this;
+
+      var typeFns = {
+        C: function C() {
+          return _this2.getNextByte();
+        },
+        R: function R() {
+          var raw = _this2.getNextByte();
+          var value = _this2.registers.read(raw);
+          return { value: value, raw: raw };
+        },
+        RA: function RA() {
+          var raw = _this2.getNextByte();
+          var value = _this2.memory.read(_this2.registers.read(raw));
+          return { value: value, raw: raw };
+        },
+        CA: function CA() {
+          var addr1 = _this2.getNextByte();
+          var addr2 = _this2.getNextByte();
+          var raw = (addr1 << 8) + addr2;
+          return { value: raw, raw: raw };
+        },
+        A: function A() {
+          var addr1 = _this2.getNextByte();
+          var addr2 = _this2.getNextByte();
+          var raw = (addr1 << 8) + addr2;
+          var value = _this2.memory.read(raw);
+          return { value: raw, raw: raw };
+        }
+      };
+      if (typeof typeFns[type] !== "function") throw new Error('Unknown arg type "' + type + '"');
+      return typeFns[type]();
+    }
+  }]);
+
+  return CPU;
+}(_eventsEs.EventEmitter);
+
+exports.default = CPU;
+
+},{"./CPUFunctions":328,"./opcodes":334,"events-es6":326}],328:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var getFlagMathFunc = function getFlagMathFunc(flags, value) {
+  return value <= 0xF ? flags.applyMath8.bind(flags) : flags.applyMath16.bind(flags);
+};
+
+exports.default = {
+  // HALT
+  HLT: function HLT(cpu) {
+    cpu.halt();
+  },
+  // INCREMENT, DECREMENT
+  INC: function INC(cpu, arg1) {
+    var curVal = cpu.registers.read(arg1.value);
+    var res = curVal + 1;
+    var flagFn = getFlagMathFunc(cpu.flags, arg1.value);
+    res = flagFn(curVal, 1, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  DEC: function DEC(cpu, arg1) {
+    var curVal = cpu.registers.read(arg1.value);
+    var res = curVal - 1;
+    var flagFn = getFlagMathFunc(cpu.flags, arg1.value);
+    res = flagFn(curVal, 1, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  // MATH
+  ADD: function ADD(cpu, arg1, arg2) {
+    var res = arg1.value + arg2.value;
+    res = cpu.flags.applyMath8(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  SUB: function SUB(cpu, arg1, arg2) {
+    var res = arg1.value - arg2.value;
+    res = cpu.flags.applyMath8(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  MUL: function MUL(cpu, arg1, arg2) {
+    var res = arg1.value * arg2.value;
+    res = cpu.flags.applyMath8(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  DIV: function DIV(cpu, arg1, arg2) {
+    var res = Math.round(arg1.value / arg2.value);
+    res = cpu.flags.applyMath8(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  CMP: function CMP(cpu, arg1, arg2) {
+    var res = arg1.value - arg2.value;
+    res = cpu.flags.applyMath8(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  // BITWISE
+  AND: function AND(cpu, arg1, arg2) {
+    var res = arg1.value & arg2.value;
+    res = cpu.flags.applyBit(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  OR: function OR(cpu, arg1, arg2) {
+    var res = arg1.value | arg2.value;
+    res = cpu.flags.applyBit(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  XOR: function XOR(cpu, arg1, arg2) {
+    var res = arg1.value ^ arg2.value;
+    res = cpu.flags.applyBit(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  SHL: function SHL(cpu, arg1, arg2) {
+    var res = arg1.value << arg2.value & 0xFF;
+    res = cpu.flags.applyBit(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  SHR: function SHR(cpu, arg1, arg2) {
+    var res = arg1.value >> arg2.value & 0xFF;
+    res = cpu.flags.applyBit(arg1.value, arg2.value, res);
+    cpu.registers.write(arg1.raw, res);
+  },
+  // STACK
+  PUSH: function PUSH(cpu, arg1) {
+    cpu.memory.write(cpu.SP--, arg1.value);
+  },
+  POP: function POP(cpu, arg1) {
+    var value = cpu.memory.read(cpu.SP++);
+    cpu.reagisters.write(arg1.raw, value);
+  },
+  // JUMPS
+  JMP: function JMP(cpu, arg1) {
+    cpu.PC = arg1.value;
+  },
+  JE: function JE(cpu, arg1) {
+    if (cpu.flags.zero) {
+      cpu.PC = arg1.value;
+    }
+  },
+  JNE: function JNE(cpu, arg1) {
+    if (!cpu.flags.zero) {
+      cpu.PC = arg1.value;
+    }
+  },
+  JG: function JG(cpu, arg1) {
+    if (cpu.flags.sign !== cpu.flags.overflow) {
+      cpu.PC = arg1.value;
+    }
+  },
+  JGE: function JGE(cpu, arg1) {
+    if (cpu.flags.carry || cpu.flags.zero) {
+      cpu.PC = arg1.value;
+    }
+  },
+  JL: function JL(cpu, arg1) {
+    if (!cpu.flags.zero && cpu.flags.sign === cpu.flags.overflow) {
+      cpu.PC = arg1.value;
+    }
+  },
+  JLE: function JLE(cpu, arg1) {
+    if (cpu.flags.sign === cpu.flags.overflow) {
+      cpu.PC = arg1.value;
+    }
+  },
+  // MOV
+  MOV: function MOV(cpu, arg1, arg2) {
+    if (arg1.type === 'R') {
+      cpu.registers.write(arg1.raw, arg2.value);
+    }
+    if (arg1.type === 'RA' || arg1.type === 'A' || arg1.type === 'C') {
+      cpu.memory.write(arg1.value, arg2.value);
+    }
+  },
+  // BREAK
+  BRK: function BRK(cpu) {
+    cpu.halt();
+    cpu.emit('break', cpu);
+  }
+};
+
+},{}],329:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventsEs = require('events-es6');
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Clock = function (_EventEmitter) {
+  _inherits(Clock, _EventEmitter);
+
+  function Clock(speed) {
+    _classCallCheck(this, Clock);
+
+    var _this = _possibleConstructorReturn(this, (Clock.__proto__ || Object.getPrototypeOf(Clock)).call(this));
+
+    _this.speed = speed;
+    _this.timer = null;
+    return _this;
+  }
+
+  _createClass(Clock, [{
+    key: 'tick',
+    value: function tick() {
+      this.emit('tick');
+    }
+  }, {
+    key: 'start',
+    value: function start() {
+      this.timer = setInterval(this.tick.bind(this), this.speed);
+      this.emit('start');
+    }
+  }, {
+    key: 'stop',
+    value: function stop() {
+      clearInterval(this.timer);
+      this.timer = null;
+      this.emit('stop');
+    }
+  }]);
+
+  return Clock;
+}(_eventsEs.EventEmitter);
+
+exports.default = Clock;
+
+},{"events-es6":326}],330:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventsEs = require('events-es6');
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Flags = function (_EventEmitter) {
+  _inherits(Flags, _EventEmitter);
+
+  function Flags() {
+    _classCallCheck(this, Flags);
+
+    var _this = _possibleConstructorReturn(this, (Flags.__proto__ || Object.getPrototypeOf(Flags)).call(this));
+
+    _this.flags = {
+      carry: false,
+      parity: false,
+      zero: false,
+      sign: false,
+      overflow: false
+    };
+    return _this;
+  }
+
+  _createClass(Flags, [{
+    key: 'applyMath8',
+    value: function applyMath8(A, B, res) {
+      this.flags.zero = res === 0;
+      this.flags.sign = res >> 7 > 0;
+      this.flags.parity = !!(res & 0x1);
+      this.flags.overflow = (A & 0x80) === (B & 0x80) && (res & 0x80) !== (A & 0x80);
+      if (res > 0xFF || res < 0) {
+        this.flags.carry = true;
+        res = res && 0xFF;
+      } else {
+        this.flags.carry = false;
+      }
+      this.emit('setflags', Object.assign({}, this.flags));
+      return res;
+    }
+  }, {
+    key: 'applyMath16',
+    value: function applyMath16(A, B, res) {
+      this.flags.zero = res === 0;
+      this.flags.sign = res >> 7 > 0;
+      this.flags.parity = !!(res & 0x1);
+      this.flags.overflow = (A & 0x8000) === (B & 0x8000) && (res & 0x8000) !== (A & 0x8000);
+      if (res > 0xFFFF || res < 0) {
+        this.flags.carry = true;
+        res = res && 0xFFFF;
+      } else {
+        this.flags.carry = false;
+      }
+      this.emit('setflags', Object.assign({}, this.flags));
+      return res;
+    }
+  }, {
+    key: 'applyBit',
+    value: function applyBit(A, B, res) {
+      this.flags.zero = res === 0;
+      this.flags.sign = res >> 7 > 0;
+      this.flags.parity = res & 0x1;
+      this.emit('setflags', Object.assign({}, this.flags));
+      return res;
+    }
+  }, {
+    key: 'carry',
+    get: function get() {
+      return this.flags.carry;
+    }
+  }, {
+    key: 'parity',
+    get: function get() {
+      return this.flags.parity;
+    }
+  }, {
+    key: 'zero',
+    get: function get() {
+      return this.flags.zero;
+    }
+  }, {
+    key: 'sign',
+    get: function get() {
+      return this.flags.sign;
+    }
+  }, {
+    key: 'overflow',
+    get: function get() {
+      return this.flags.overflow;
+    }
+  }]);
+
+  return Flags;
+}(_eventsEs.EventEmitter);
+
+exports.default = Flags;
+
+},{"events-es6":326}],331:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Memory = function () {
+  function Memory() {
+    _classCallCheck(this, Memory);
+
+    this.raw = new ArrayBuffer(0xFFFF);
+    this.mem = new Uint8Array(this.raw, 0);
+  }
+
+  _createClass(Memory, [{
+    key: 'clean',
+    value: function clean() {
+      this.mem.fill(0x0);
+    }
+  }, {
+    key: 'set',
+    value: function set(source, offset) {
+      this.mem.set(source, offset);
+    }
+  }, {
+    key: 'write',
+    value: function write(address, value) {
+      if (address >= this.mem.length) throw new Error('Invalid memory location');
+      return this.mem[address] = value;
+    }
+  }, {
+    key: 'read',
+    value: function read(address) {
+      if (address >= this.mem.length) throw new Error('Invalid memory location');
+      return this.mem[address];
+    }
+  }, {
+    key: 'getRegion',
+    value: function getRegion(address, length) {
+      var len = length !== undefined ? length : this.mem.length - address;
+      if (len + address > this.mem.length) throw new Error('Given length is bigger than memory length');
+    }
+  }, {
+    key: 'length',
+    get: function get() {
+      return this.mem.length;
+    }
+  }]);
+
+  return Memory;
+}();
+
+exports.default = Memory;
+
+},{}],332:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -7575,23 +8389,75 @@ var Registers = function () {
 
 exports.default = Registers;
 
-},{}],327:[function(require,module,exports){
+},{}],333:[function(require,module,exports){
 'use strict';
+
+var _CPU = require('./CPU');
+
+var _CPU2 = _interopRequireDefault(_CPU);
+
+var _Memory = require('./Memory');
+
+var _Memory2 = _interopRequireDefault(_Memory);
 
 var _Registers = require('./Registers');
 
 var _Registers2 = _interopRequireDefault(_Registers);
 
+var _Flags = require('./Flags');
+
+var _Flags2 = _interopRequireDefault(_Flags);
+
+var _Clock = require('./Clock');
+
+var _Clock2 = _interopRequireDefault(_Clock);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 require('babel-polyfill');
 
-var r = new _Registers2.default();
+var cpu = new _CPU2.default({
+  memory: new _Memory2.default(),
+  registers: new _Registers2.default(),
+  flags: new _Flags2.default(),
+  clock: new _Clock2.default(500)
+});
 
-r.write(0, 0xff);
+var prog = new Uint8Array([42, 0, 10, // MOV A, 10
+42, 1, 10, // MOV A, 20,
+0x0]);
 
-var v = r.read(0);
+cpu.loadProgram(prog);
 
-console.log('ok', v);
+cpu.run();
 
-},{"./Registers":326,"babel-polyfill":1}]},{},[327]);
+cpu.on('exec', function (cmd, arg1, arg2) {
+  console.log('Exec:', cmd, arg1, arg2);
+});
+cpu.on('halt', function () {
+  console.log('HALT');
+});
+
+window.cpu = cpu;
+
+},{"./CPU":327,"./Clock":329,"./Flags":330,"./Memory":331,"./Registers":332,"babel-polyfill":1}],334:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+var opcodes = ['HLT', 'ADD_R_R', 'ADD_R_RA', 'ADD_R_A', 'ADD_R_C', 'SUB_R_R', 'SUB_R_RA', 'SUB_R_A', 'SUB_R_C', 'MUL_R_R', 'MUL_R_RA', 'MUL_R_A', 'MUL_R_C', 'DIV_R_R', 'DIV_R_RA', 'DIV_R_A', 'DIV_R_C', 'INC_R', 'DEC_R', 'AND_R_R', 'AND_R_RA', 'AND_R_A', 'AND_R_C', 'OR_R_R', 'OR_R_RA', 'OR_R_A', 'OR_R_C', 'XOR_R_R', 'XOR_R_RA', 'XOR_R_A', 'XOR_R_C', 'SHL_R_R', 'SHL_R_RA', 'SHL_R_A', 'SHL_R_C', 'SHR_R_R', 'SHR_R_RA', 'SHR_R_A', 'SHR_R_C', 'MOV_R_R', 'MOV_R_RA', 'MOV_R_A', 'MOV_R_C', 'MOV_RA_R', 'MOV_A_R', 'MOV_RA_C', 'MOV_A_C', 'PUSH_R', 'PUSH_RA', 'PUSH_A', 'PUSH_C', 'POP_R', 'JMP_RA', 'JMP_A', 'JMP_C', 'JE_RA', 'JE_A', 'JE_C', 'JNE_RA', 'JNE_A', 'JNE_C', 'JG_RA', 'JG_A', 'JG_C', 'JGE_RA', 'JGE_A', 'JGE_C', 'JL_RA', 'JL_A', 'JL_C', 'JLE_RA', 'JLE_A', 'JLE_C', 'CMP_R_R', 'CMP_R_RA', 'CMP_R_A', 'CMP_R_C', 'CALL_RA', 'CALL_A', 'CALL_C', 'RET', 'INT', 'BRK',
+// Added constant address
+'ADD_R_CA', 'SUB_R_CA', 'MUL_R_CA', 'DIV_R_CA', 'AND_R_CA', 'OR_R_CA', 'XOR_R_CA', 'SHL_R_CA', 'SHR_R_CA', 'MOV_R_CA', 'MOV_CA_R', 'MOV_CA_C', 'CMP_R_CA', 'PUSH_CA', 'JMP_CA', 'JE_CA', 'JNE_CA', 'JG_CA', 'JGE_CA', 'JL_CA', 'JLE_CA', 'CALL_CA'];
+
+exports.default = {
+  opcodes: opcodes.reduce(function (prev, cur, i) {
+    return Object.assign({}, prev, _defineProperty({}, cur, i));
+  }, {}),
+  oplist: opcodes
+};
+
+},{}]},{},[333]);
