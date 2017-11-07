@@ -74,7 +74,10 @@ class CPU extends EventEmitter {
 
   getNextArg (type) {
     const typeFns = {
-      C: () => this.getNextByte(),
+      C: () => {
+        const raw = this.getNextByte()
+        return { value: raw, raw }
+      },
       R: () => {
         const raw = this.getNextByte()
         const value = this.registers.read(raw)

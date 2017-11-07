@@ -7939,7 +7939,8 @@ var CPU = function (_EventEmitter) {
 
       var typeFns = {
         C: function C() {
-          return _this2.getNextByte();
+          var raw = _this2.getNextByte();
+          return { value: raw, raw: raw };
         },
         R: function R() {
           var raw = _this2.getNextByte();
