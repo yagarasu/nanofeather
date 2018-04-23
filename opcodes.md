@@ -2,6 +2,7 @@
 
 ## Commands 
 
+```
 - HLT - Halt program                                1
 
 - ADD rr, (rr|mm|dd) - Add                          3
@@ -32,3 +33,4 @@
 - CMP (rr|mm), (rr|mm|cc) - compare                 6
 - CALL (rr|mm|cc) - call subroutine                 3
 - RET - return from subroutine                      1
+```
